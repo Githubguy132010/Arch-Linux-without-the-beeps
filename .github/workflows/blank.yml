@@ -25,7 +25,6 @@ jobs:
           pacman -Syu --noconfirm &&
           pacman -S --noconfirm git archiso grub &&
           cd /workdir &&
-          cd /ArchGUI &&
           mkarchiso -v -w workdir/ -o out/ /workdir
           "
 
