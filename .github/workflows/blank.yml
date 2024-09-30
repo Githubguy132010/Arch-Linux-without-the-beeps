@@ -25,10 +25,10 @@ jobs:
           pacman -Syu --noconfirm &&
           pacman -S --noconfirm git archiso grub &&
           cd /workdir &&
-          mkarchiso -v -w workdir/ -o out/.
+          sudo mkarchiso -v -w workdir/ -o out/ .
           "
 
-      - name: Rename the Created ISO to BlendOS.iso
+      - name: Rename ISO to Arch
         run: |
           docker exec arch-container bash -c "
           # Find the created ISO (assuming only one .iso file in the output directory)
