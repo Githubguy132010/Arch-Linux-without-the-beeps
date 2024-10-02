@@ -7,12 +7,11 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
   schedule:
-    # Run the workflow on the 1st of every month at midnight
-    - cron: '0 0 1 * *'
+    - cron: '0 0 1 * *'  # Monthly run
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # Use a standard runner
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
@@ -34,46 +33,38 @@ jobs:
       - name: Rename ISO to Arch
         run: |
           docker exec arch-container bash -c "
-          # Find the created ISO (assuming only one .iso file in the output directory)
           iso_file=\$(ls /workdir/out/*.iso | head -n 1) &&
           mv \$iso_file /workdir/out/Arch.iso
           "
 
       - name: List ISO files
-        run: |
-          # List files in the output directory to verify renaming
-          docker exec arch-container bash -c "ls -l /workdir/out/"
+        run: docker exec arch-container bash -c "ls -l /workdir/out/"
 
       - name: Copy ISO to Host
-        run: |
-          # Copy the renamed ISO to the host
-          docker cp arch-container:/workdir/out/Arch.iso ${{ github.workspace }}/
+        run: docker cp arch-container:/workdir/out/Arch.iso ${{ github.workspace }}/
 
       - name: Get current date
         id: date
         run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
-      # Create a release on GitHub
       - name: Create GitHub Release
-        id: create_release  # Store the release details for later steps
-        uses: actions/create-release@v1
+        id: create_release
+        uses: actions/create-release@v1  # Consider updating to v1.1.0 or newer
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ github.event.inputs.date || github.run_number }}-release
-          release_name: Arch Linux ISO Release ${{ github.event.inputs.date || format('for {0}', github.run_number) }}
-          body: |
-            This release contains the Arch Linux ISO built on ${{ steps.date.outputs.date }}.
+          tag_name: "v${{ steps.date.outputs.date }}-release"
+          release_name: "Arch Linux ISO Release - ${{ steps.date.outputs.date }}"
+          body: "This release contains the Arch Linux ISO built on ${{ steps.date.outputs.date }}."
           draft: false
           prerelease: false
 
-      # Upload the ISO to the release
       - name: Upload ISO to GitHub Release
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ${{ github.workspace }}/Arch.iso
-          asset_name: Arch-$(date +'%Y-%m-%d').iso
+          asset_name: Arch-${{ steps.date.outputs.date }}.iso
           asset_content_type: application/octet-stream
 
       - name: Clean Up
