@@ -1,10 +1,8 @@
-Here's the updated README with the workflow snippet included:
 
----
 
 # Arch Linux Without the Beeps
 
-This repository provides a customized Arch Linux ISO with the system bell (beeps) disabled, ideal for users who prefer a quieter environment.
+This repository provides a customized Arch Linux ISO with the system beeps disabled, ideal for users who prefer a quieter environment.
 
 ## Features
 
@@ -32,8 +30,8 @@ This project uses GitHub Actions to automatically build and release an Arch Linu
    ```
 2. **Run the workflow**
 
-You can run the workflow manually by going to Actions > Build ISO and click on run Workflow.
-Keep un mind you are going to need a PAT (Personal access Token) and you need to edit the Workflow to reflect your PAT.
+  You can run the workflow manually by going to Actions > Build ISO and click on run Workflow.
+  Keep un mind you are going to need a PAT (Personal access Token) and you need to edit the Workflow to reflect your PAT.
 
 2. **Automated Workflow**: The GitHub Actions workflow automatically triggers on:
    - **Pushes** and **Pull Requests** to the `main` branch
