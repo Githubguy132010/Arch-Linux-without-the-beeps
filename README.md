@@ -33,11 +33,12 @@ This project uses GitHub Actions to automatically build and release an Arch Linu
   You can run the workflow manually by going to Actions > Build ISO and click on run Workflow.
   Keep un mind you are going to need a PAT (Personal access Token) and you need to edit the Workflow to reflect your PAT.
 
-2. **Automated Workflow**: The GitHub Actions workflow automatically triggers on:
+
+3. **Automated Workflow**: The GitHub Actions workflow automatically triggers on:
    - **Pushes** and **Pull Requests** to the `main` branch
    - **Scheduled daily builds** at midnight (UTC)
 
-3. **Download the ISO**:
+4. **Download the ISO**:
    - Visit the [releases page](https://github.com/Githubguy132010/Arch-Linux-without-the-beeps/releases) to download the latest ISO.
 
 ## Configuration Details
@@ -47,10 +48,10 @@ This project disables the systemd-boot by modifying several configuration files.
 
 ## GitHub Actions Workflow
 
-The workflow file for building and releasing the custom ISO is located at `.github/workflows/build-iso.yml`. Here's the workflow snippet:
+The workflow file for building and releasing the custom ISO is located at `.github/workflows/build.yml`. Here's the workflow snippet:
 
 ```yaml
-name: Build ISO Without Beeps
+name: Build ISO
 
 on:
   push:
@@ -82,7 +83,7 @@ jobs:
           mkarchiso -v -w workdir/ -o out/ .
           "
 
-      - name: Rename ISO to ArchGUI-NoBeeps.iso
+      - name: Rename ISO to Arch.iso
         run: |
           docker exec arch-container bash -c "
           iso_file=\$(ls /workdir/out/*.iso | head -n 1) &&
