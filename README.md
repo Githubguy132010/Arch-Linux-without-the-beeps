@@ -31,19 +31,16 @@ This project uses GitHub Actions to automatically build and release an Arch Linu
 2. **Run the workflow**
 
   You can run the workflow manually by going to Actions > Build ISO and click on run Workflow.
-  Keep un mind you are going to need a PAT (Personal access Token) and you need to edit the Workflow to reflect your PAT.
+  Keep in mind you are going to need a PAT (Personal access Token) and you need to edit the Workflow to reflect your PAT.
 
 
-3. **Automated Workflow**: The GitHub Actions workflow automatically triggers on:
+4. **Automated Workflow**: The GitHub Actions workflow automatically triggers on:
    - **Pushes** and **Pull Requests** to the `main` branch
    - **Scheduled daily builds** at midnight (UTC)
 
-4. **Download the ISO**:
+5. **Download the ISO**:
    - Visit the [releases page](https://github.com/Githubguy132010/Arch-Linux-without-the-beeps/releases) to download the latest ISO.
 
-## Configuration Details
-
-This project disables the systemd-boot by modifying several configuration files. The changes are applied during the ISO build process.
 
 
 ## GitHub Actions Workflow
