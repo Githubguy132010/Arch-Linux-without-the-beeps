@@ -53,19 +53,18 @@ jobs:
         id: date
         run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
-      # Create a release on GitHub using Personal Access Token (PAT)
-      - name: Create GitHub Release
-        id: create_release  # Store the release details for later steps
-        uses: actions/create-release@v1.1.4
+      # Create a release on GitHub using Personal Access Token (PAT)  - name: Create GitHub Release
+      - uses: actions/create-release@v1.1.4
         env:
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # Use your PAT here
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         with:
-          tag_name: v${{ steps.date.outputs.date || github.run_number }}-release
-          release_name: ${{ steps.date.outputs.date }}  # Current date as release title
+          tag_name: v${{ github.run_id }}-release
+          release_name: "Arch Linux Release"
           body: |
-            This release contains the Arch Linux ISO built on ${{ steps.date.outputs.date }}.
+            This release contains the Arch Linux ISO built on ${{ github.run_id }}.
           draft: false
           prerelease: false
+
 
       # Upload the ISO to the GitHub release with a specific, predictable name
       - name: Upload ISO to GitHub Release
