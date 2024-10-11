@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
   schedule:
     # Run the workflow on the 1st of every month at midnight
-    - cron: '0 0 * * *'
+    - cron: '0 0 1 * *'
 
 jobs:
   build:
@@ -53,8 +53,10 @@ jobs:
         id: date
         run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
-      # Create a release on GitHub using Personal Access Token (PAT)  - name: Create GitHub Release
-      - uses: actions/create-release@v1.1.4
+      # Create a release on GitHub using Personal Access Token (PAT)
+      - name: Create GitHub Release
+        id: create_release  # Adding an ID to reference the release step
+        uses: actions/create-release@v1.1.4
         env:
           GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         with:
@@ -65,16 +67,15 @@ jobs:
           draft: false
           prerelease: false
 
-
       # Upload the ISO to the GitHub release with a specific, predictable name
       - name: Upload ISO to GitHub Release
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # Use your PAT here
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/Arch.iso  # Keep ISO name as Arch.iso
-          asset_name: Arch.iso  # Set asset name to Arch.iso
+          upload_url: ${{ steps.create_release.outputs.upload_url }}  # Fixing the upload_url reference
+          asset_path: ${{ github.workspace }}/Arch.iso
+          asset_name: Arch.iso
           asset_content_type: application/octet-stream
 
       - name: Clean Up
