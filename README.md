@@ -1,4 +1,6 @@
 
+---
+
 # Arch Linux Without the Beeps
 
 This repository provides a customized Arch Linux ISO with the system beeps disabled, ideal for users who prefer a quieter environment.
@@ -37,13 +39,13 @@ Make sure you have Docker installed on your system.
    docker build -t arch-iso-builder .
    ```
 
-3. **Build the ISO in the container**
+3. **Build the ISO in the container**:
 
    Build the ISO with this command:
 
-   '''bash
+   ```bash
    docker run --rm --privileged -v $(pwd):/workdir arch-iso-builder bash -c "mkarchiso -v -w workdir/ -o out/ ."
-  ''' 
+   ```
 
 4. **Retrieve the ISO**:
 
@@ -66,13 +68,6 @@ WORKDIR /workdir
 
 # Copy the entire repository into the container
 COPY . .
-
-# Build the Arch ISO
-RUN mkarchiso -v -w workdir/ -o out/ .
-
-# Rename the generated ISO to Arch.iso (if only one ISO is generated)
-RUN iso_file=$(ls out/*.iso | head -n 1) && \
-    mv $iso_file out/Arch.iso
 
 # Set the output directory as a volume so you can retrieve the ISO later
 VOLUME /workdir/out
@@ -169,7 +164,7 @@ jobs:
           tag_name: v${{ steps.date.outputs.date }}-release
           release_name: ${{ steps.date.outputs.date }}
           body: |
-            This release contains the Arch Linux ISO built on ${{ steps.date.outputs.date }}
+            This release contains the Arch Linux ISO built on ${{ steps.date.outputs.date }}.
           draft: false
           prerelease: false
 
