@@ -1,5 +1,4 @@
 
-```markdown
 # Arch Linux Without the Beeps
 
 This repository provides a customized Arch Linux ISO with the system beeps disabled, ideal for users who prefer a quieter environment.
