@@ -1,25 +1,15 @@
-# Use the official Arch Linux image as the base
 FROM archlinux:latest
 
-# Update system and install necessary packages
+# Install necessary packages
 RUN pacman -Syu --noconfirm && \
     pacman -S --noconfirm git archiso grub
 
-# Create a directory for the workspace
+# Set the working directory
 WORKDIR /workdir
 
-# Copy the entire repository into the container
+# Copy files into the container
 COPY . .
 
-# Build the Arch ISO
-RUN mkarchiso -v -w workdir/ -o out/ .
-
-# Rename the generated ISO to Arch.iso (if only one ISO is generated)
-RUN iso_file=$(ls out/*.iso | head -n 1) && \
-    mv $iso_file out/Arch.iso
-
-# Set the output directory as a volume so you can retrieve the ISO later
-VOLUME /workdir/out
-
-# The default command just keeps the container running
-CMD [ "sleep", "infinity" ]
+# Instead of running mkarchiso here, we leave it for later execution
+# Create an entrypoint or leave it to manual execution
+CMD ["/bin/bash"]
