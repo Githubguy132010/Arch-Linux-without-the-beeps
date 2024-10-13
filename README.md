@@ -37,15 +37,7 @@ Make sure you have Docker installed on your system.
    docker build -t arch-iso-builder .
    ```
 
-3. **Run the Docker Container**:
-
-   This step will run the container and automatically build the ISO. The resulting ISO will be saved in the `out/` directory.
-
-   ```bash
-   docker run --rm -v $(pwd):/workdir arch-iso-builder
-   ```
-
-4. **Retrieve the ISO**:
+3. **Retrieve the ISO**:
 
    Once the process completes, the ISO will be available in the `out/` directory within your local folder as `Arch.iso`.
 
