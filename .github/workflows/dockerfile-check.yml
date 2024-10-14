@@ -1,0 +1,27 @@
+name: Check to make sure Dockerfile works
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+  schedule:
+    # Run the workflow on the 1st of every month at midnight
+    - cron: 0 0 * * *
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # Use a standard runner
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker container
+        run: |
+         docker build -t arch-iso-builder .
+
+      - name: Make ISO in Docker container
+        run: |
+         docker run --rm --privileged -v $(pwd):/workdir arch-iso-builder bash -c "mkarchiso -v -w workdir/ -o out/ ."
