@@ -54,7 +54,7 @@ jobs:
         id: create_release  # Adding an ID to reference the release step
         uses: actions/create-release@v1.1.4
         env:
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: v${{ github.run_id }}-release
           release_name: "Arch Linux Release"
@@ -67,9 +67,9 @@ jobs:
       - name: Upload ISO to GitHub Release
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}  # Fixing the upload_url reference
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ${{ github.workspace }}/Arch.iso
           asset_name: Arch.iso
           asset_content_type: application/octet-stream
