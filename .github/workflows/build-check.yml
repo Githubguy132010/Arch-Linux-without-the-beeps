@@ -1,0 +1,32 @@
+name: Check if ISO can be built
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+  schedule:
+    # Run the workflow every day at midnight
+    - cron: 0 0 * * *
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # Use a standard runner
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Arch Linux Container
+        run: |
+          docker run --privileged --name arch-container -d -v ${{ github.workspace }}:/workdir archlinux:latest sleep infinity
+
+      - name: Build ISO in Arch Container
+        run: |
+          docker exec arch-container bash -c "
+          pacman -Syu --noconfirm &&
+          pacman -S --noconfirm git archiso grub &&
+          cd /workdir &&
+          mkarchiso -v -w workdir/ -o out/ .
+          "
