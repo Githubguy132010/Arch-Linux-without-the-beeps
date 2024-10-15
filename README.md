@@ -182,7 +182,7 @@ jobs:
       - name: Clean Up
         run: |
           docker stop arch-container
-          docker rm arch-container
+          docker rm arch-container**
 ```
 
 ---
