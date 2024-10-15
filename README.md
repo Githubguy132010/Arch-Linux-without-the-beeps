@@ -106,8 +106,6 @@ The GitHub Actions workflow automatically builds and releases the ISO. Here’s 
 1. **Run the workflow manually**:
    You can run the workflow manually by going to **Actions > Build ISO** and clicking on **Run Workflow**. 
 
-   Keep in mind that you will need a Personal Access Token (PAT) and to modify the workflow file to include your PAT.
-   EDIT: Not needed anymore!
 
 ### GitHub Actions Workflow Example
 
