@@ -85,7 +85,7 @@ This repository also includes a GitHub Actions workflow for building and releasi
 ### How It Works:
 
 1. **Automated Workflow**: The workflow is triggered by:
-   - **Pushes** and **Pull Requests** to the `main` branch
+   - **A manual run**
    - **Scheduled daily builds** at midnight (UTC)
 
 2. **Download the ISO**:
