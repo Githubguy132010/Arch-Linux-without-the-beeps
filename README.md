@@ -115,17 +115,14 @@ Here's the full GitHub Actions workflow used for automated builds and releases:
 name: Build ISO
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  workflow_dispatch:
   schedule:
-    # Runs every day at midnight
-    - cron: '0 0 * * *'
+    # Run the workflow every day at midnight
+    - cron: 0 0 * * *
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # Use a standard runner
 
     steps:
       - name: Checkout Repository
@@ -147,30 +144,44 @@ jobs:
       - name: Rename ISO to Arch.iso
         run: |
           docker exec arch-container bash -c "
+          # Find the created ISO (assuming only one .iso file in the output directory)
           iso_file=\$(ls /workdir/out/*.iso | head -n 1) &&
           mv \$iso_file /workdir/out/Arch.iso
           "
 
+      - name: List ISO files
+        run: |
+          # List files in the output directory to verify renaming
+          docker exec arch-container bash -c "ls -l /workdir/out/"
+
       - name: Copy ISO to Host
         run: |
+          # Copy the renamed ISO to the host
           docker cp arch-container:/workdir/out/Arch.iso ${{ github.workspace }}/
-      
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      # Create a release on GitHub using Personal Access Token (PAT)
       - name: Create GitHub Release
+        id: create_release  # Adding an ID to reference the release step
         uses: actions/create-release@v1.1.4
         env:
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ steps.date.outputs.date }}-release
-          release_name: ${{ steps.date.outputs.date }}
+          tag_name: v${{ github.run_id }}-release
+          release_name: "Arch Linux Release"
           body: |
             This release contains the Arch Linux ISO built on ${{ steps.date.outputs.date }}.
           draft: false
           prerelease: false
 
+      # Upload the ISO to the GitHub release with a specific, predictable name
       - name: Upload ISO to GitHub Release
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ${{ github.workspace }}/Arch.iso
@@ -180,7 +191,7 @@ jobs:
       - name: Clean Up
         run: |
           docker stop arch-container
-          docker rm arch-container**
+          docker rm arch-container
 ```
 
 ---
