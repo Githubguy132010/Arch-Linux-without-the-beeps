@@ -18,10 +18,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Build Docker container
+      - name: Build and Run Docker container
         run: |
-         docker build -t arch-iso-builder .
-
-      - name: Make ISO in Docker container
-        run: |
-         docker run --rm --privileged -v $(pwd):/workdir arch-iso-builder bash -c "mkarchiso -v -w workdir/ -o out/ ."
+          set -e  # Exit immediately if a command exits with a non-zero status
+          docker build -t arch-iso-builder . || { echo "Docker build failed"; exit 1; }
+          docker run --rm --privileged -v "$(pwd)":/workdir arch-iso-builder bash -c "mkarchiso -v -w workdir/ -o out/ ." || { echo "ISO creation failed"; exit 1; }
