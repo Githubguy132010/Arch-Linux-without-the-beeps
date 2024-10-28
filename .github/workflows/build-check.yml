@@ -20,13 +20,17 @@ jobs:
 
       - name: Set up Arch Linux Container
         run: |
-          docker run --privileged --name arch-container -d -v ${{ github.workspace }}:/workdir archlinux:latest sleep infinity
+          if ! docker run --privileged --name arch-container -d -v ${{ github.workspace }}:/workdir archlinux:latest sleep infinity; then
+            echo "Failed to start Arch Linux container." && exit 1
+          fi
 
-      - name: Build ISO in Arch Container
+      - name: Update and Build ISO in Arch Container
         run: |
-          docker exec arch-container bash -c "
-          pacman -Syu --noconfirm &&
-          pacman -S --noconfirm git archiso grub &&
-          cd /workdir &&
-          mkarchiso -v -w workdir/ -o out/ .
-          "
+          if ! docker exec arch-container bash -c "
+            pacman -Syu --noconfirm &&
+            pacman -S --noconfirm git archiso grub &&
+            cd /workdir &&
+            mkarchiso -v -w workdir/ -o out/ .
+          "; then
+            echo "Failed to build ISO." && exit 1
+          fi

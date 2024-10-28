@@ -2,12 +2,11 @@ version: 2
 updates:
   # Update for GitHub Actions dependencies
   - package-ecosystem: "github-actions"
-    directory: "/"              # Root directory where your GitHub Actions workflows are located (usually .github/workflows)
+    directory: "/"              # Root directory for GitHub Actions workflows
     schedule:
-      interval: "daily"        # Check for updates weekly
-      day: "monday"             # Run every Monday
-      time: "08:00"             # At 8:00 UTC
+      interval: "daily"        # Check for updates daily (previously mentioned as weekly)
+      time: "08:00"            # Run every day at 08:00 UTC, day specification removed as it's redundant
     labels:
       - "github-actions"
     assignees:
-      - "Githubguy132010"         # Replace with your GitHub username
+      - "Githubguy132010"       # Replace with your GitHub username
