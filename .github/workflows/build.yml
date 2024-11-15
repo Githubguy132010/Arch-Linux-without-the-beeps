@@ -16,9 +16,17 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - uses: actions/cache@v3
+        with:
+          path: pacman-cache
+          key: ${{ runner.os }}-pacman-cache
+
       - name: Set up Arch Linux Container
         run: |
-          docker run --privileged --name arch-container -d -v ${{ github.workspace }}:/workdir archlinux:latest sleep infinity
+          docker run --privileged --name arch-container -d \
+            -v ${{ github.workspace }}:/workdir \
+            -v pacman-cache:/var/cache/pacman/pkg \
+            archlinux:latest sleep infinity
 
       - name: Build ISO in Arch Container
         run: |
@@ -66,14 +74,15 @@ jobs:
 
       # Upload the ISO to the GitHub release with a specific, predictable name
       - name: Upload ISO to GitHub Release
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ github.workspace }}/Arch.iso
+          tag_name: v${{ github.run_id }}-release
+          name: "Arch Linux Release"
+          body: |
+            This release contains the Arch Linux ISO built on ${{ steps.date.outputs.date }}.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/Arch.iso
-          asset_name: Arch.iso
-          asset_content_type: application/octet-stream
 
       - name: Clean Up
         run: |
