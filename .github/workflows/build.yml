@@ -25,8 +25,7 @@ jobs:
         run: |
           docker run --privileged --name arch-container -d \
             -v ${{ github.workspace }}:/workdir \
-            -v pacman-cache:/var/cache/pacman/pkg \
-            archlinux:latest sleep infinity
+            -v archlinux:latest sleep infinity
 
       - name: Build ISO in Arch Container
         run: |
