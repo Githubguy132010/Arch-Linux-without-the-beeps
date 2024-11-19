@@ -75,28 +75,6 @@ jobs:
           asset_name: Arch.iso
           asset_content_type: application/octet-stream
 
-      # Delete the release after uploading the asset
-      - name: Delete GitHub Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_ID: ${{ steps.create_release.outputs.release_id }}
-        run: |
-          curl -X DELETE \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID
-
-      # Delete the tag associated with the release
-      - name: Delete Git Tag
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: v${{ github.run_id }}-release
-        run: |
-          curl -X DELETE \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/git/refs/tags/$TAG_NAME
-
       - name: Clean Up
         run: |
           docker stop arch-container || echo 'Failed to stop the container.'
