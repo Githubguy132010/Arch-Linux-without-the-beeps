@@ -1,4 +1,4 @@
-name: Build ISO
+name: Check if ISO can be built.
 
 on:
   pull_request:
