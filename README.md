@@ -51,32 +51,6 @@ Make sure you have Docker installed on your system.
 
    Once the process completes, the ISO will be available in the `out/` directory within your local folder as `Arch.iso`.
 
-### Dockerfile Used for Local Builds
-
-The following `Dockerfile` is used to build the ISO locally:
-
-```Dockerfile
-# Use the official Arch Linux image as the base
-FROM archlinux:latest
-
-# Update system and install necessary packages
-RUN pacman -Syu --noconfirm && \
-    pacman -S --noconfirm git archiso grub
-
-# Create a directory for the workspace
-WORKDIR /workdir
-
-# Copy the entire repository into the container
-COPY . .
-
-# Set the output directory as a volume so you can retrieve the ISO later
-VOLUME /workdir/out
-
-# The default command just keeps the container running
-CMD [ "sleep", "infinity" ]
-```
-
----
 
 ## How to Use GitHub Actions (Automated Workflow)
 
@@ -103,8 +77,8 @@ The GitHub Actions workflow automatically builds and releases the ISO. Here’s 
 
 ### How to Trigger the GitHub Workflow
 
-1. **Run the workflow manually**:
-   You can run the workflow manually by going to **Actions > Build ISO** and clicking on **Run Workflow**. 
+1. **Run the workflow**:
+   You can run the workflow by going to **Actions > Build ISO** and clicking on **Run Workflow**. 
 
 
 ---
