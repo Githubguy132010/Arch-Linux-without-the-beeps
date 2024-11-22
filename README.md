@@ -44,7 +44,7 @@ Make sure you have Docker installed on your system.
    Build the ISO with this command:
 
    ```bash
-   docker run --privileged -v $(pwd):/workdir arch-iso-builder bash -c "mkarchiso -v -w workdir/ -o out/ ."
+   docker run --rm --privileged -v $(pwd):/workdir arch-iso-builder bash -c "mkarchiso -v -w workdir/ -o out/ ."
    ```
 
 4. **Retrieve the ISO**:
