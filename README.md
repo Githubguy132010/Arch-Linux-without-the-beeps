@@ -85,4 +85,4 @@ The GitHub Actions workflow automatically builds and releases the ISO. Here’s 
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under my custom license - see the [LICENSE](LICENSE) file for details.
