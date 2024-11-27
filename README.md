@@ -1,4 +1,3 @@
-
 ---
 
 # Arch Linux Without the Beeps

@@ -5,7 +5,7 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
   schedule:
-    # Run the workflow on the 1st of every month at midnight
+    # Run the workflow every day at midnight
     - cron: 0 0 * * *
 
 jobs:
@@ -17,7 +17,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build and Run Docker container
-        run: |
-          set -e  # Exit immediately if a command exits with a non-zero status
-          docker build -t arch-iso-builder . || { echo "Docker build failed"; exit 1; }
-          docker run --rm --privileged -v "$(pwd)":/workdir arch-iso-builder bash -c "mkarchiso -v -w workdir/ -o out/ ." || { echo "ISO creation failed"; exit 1; }
+        run:
+          docker build -t arch-iso-builder .
+          docker run --rm --privileged -v "$(pwd)":/workdir arch-iso-builder bash -c "mkarchiso -v -w workdir/ -o out/ ."

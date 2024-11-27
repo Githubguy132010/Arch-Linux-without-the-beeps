@@ -19,7 +19,6 @@ jobs:
 
       - name: Build ISO in Arch Container
         run: |
-          set -e
           docker exec arch-container bash -c "
             pacman -Syu --noconfirm &&
             pacman -S --noconfirm git archiso grub &&
@@ -27,21 +26,10 @@ jobs:
             mkarchiso -v -w workdir/ -o out/ .
           "
 
-      - name: Rename ISO to Arch.iso
-        run: |
-          set -e
-          docker exec arch-container bash -c "
-            iso_file=\$(ls /workdir/out/*.iso 2>/dev/null | head -n 1) &&
-            [ -n \"\$iso_file\" ] && mv \$iso_file /workdir/out/Arch.iso || echo 'No ISO file found.'
-          "
-
-      - name: List ISO files
-        run: |
-          docker exec arch-container bash -c "ls -l /workdir/out/" || echo 'Failed to list files.'
-
+    
       - name: Copy ISO to Host
         run: |
-          docker cp arch-container:/workdir/out/Arch.iso ${{ github.workspace }}/ || echo 'Failed to copy ISO to host.'
+          docker cp arch-container:/workdir/out/Arch.iso ${{ github.workspace }}/ 
 
       - name: Get current date
         id: date
@@ -74,5 +62,5 @@ jobs:
 
       - name: Clean Up
         run: |
-          docker stop arch-container || echo 'Failed to stop the container.'
-          docker rm arch-container || echo 'Failed to remove the container.'
+          docker stop arch-container
+          docker rm arch-container
