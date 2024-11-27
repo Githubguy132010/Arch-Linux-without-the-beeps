@@ -18,5 +18,5 @@ jobs:
 
       - name: Build and Run Docker container
         run:
-          docker build -t arch-iso-builder .
+          docker build -t arch-iso-builder . \
           docker run --rm --privileged -v "$(pwd)":/workdir arch-iso-builder bash -c "mkarchiso -v -w workdir/ -o out/ ."
