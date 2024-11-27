@@ -1,28 +1,35 @@
-name: Check to make sure Dockerfile works
+name: Check Dockerfile and Build Arch ISO
 
 on:
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
   schedule:
-    # Run the workflow every day at midnight
     - cron: 0 0 * * *
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # Use a standard runner
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-      
-      - name: Install Docker
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker.io docker-compose
-          sudo systemctl start docker
 
-      - name: Build and Run Docker container
-        run:
-          docker build -t arch-iso-builder . && \
-          docker run --rm --privileged -v "$(pwd)":/workdir arch-iso-builder bash -c "mkarchiso -v -w workdir/ -o out/ ."
+      - name: Ensure Docker is installed
+        run: |
+          if ! command -v docker &> /dev/null; then
+            echo "Docker is not installed. Installing..."
+            sudo apt-get update
+            sudo apt-get install -y docker.io
+            sudo systemctl start docker
+            sudo systemctl enable docker
+          fi
+          docker --version  # Check Docker versie
+
+      - name: Build and Run Docker Container
+        run: |
+          docker build -t arch-iso-builder . 
+          docker run --rm --privileged \
+            -v "${{ github.workspace }}:/workdir" \
+            arch-iso-builder \
+            bash -c "mkarchiso -v -w workdir/ -o out/ ."
