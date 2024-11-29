@@ -8,36 +8,32 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest  # Use a standard runner
+    container:
+      image: archlinux:latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Arch Linux Container
+      - name: Update Arch Linux and install dependencies
         run: |
-          docker run --privileged --name arch-container -d -v ${{ github.workspace }}:/workdir archlinux:latest sleep infinity
+          pacman -Syu --noconfirm &&
+          pacman -S --noconfirm git archiso grub
 
-      - name: Build ISO in Arch Container
+      - name: Build ISO
         run: |
-          docker exec arch-container bash -c "
-            pacman -Syu --noconfirm &&
-            pacman -S --noconfirm git archiso grub &&
-            cd /workdir &&
-            mkarchiso -v -w workdir/ -o out/ .
-          "
+          mkarchiso -v -w workdir/ -o out/ .
 
-    
-      - name: Copy ISO to Host
+      - name: Rename ISO
         run: |
-          docker cp arch-container:/workdir/out/Arch.iso ${{ github.workspace }}/ 
+          mv out/*.iso out/Arch.iso
 
       - name: Get current date
         id: date
         run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
-      # Create a release on GitHub using GITHUB_TOKEN
       - name: Create GitHub Release
-        id: create_release  # Adding an ID to reference the release step
+        id: create_release
         uses: actions/create-release@v1.1.4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -49,18 +45,12 @@ jobs:
           draft: false
           prerelease: false
 
-      # Upload the ISO to the GitHub release with a specific, predictable name
       - name: Upload ISO to GitHub Release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/Arch.iso
+          asset_path: out/Arch.iso
           asset_name: Arch.iso
           asset_content_type: application/octet-stream
-
-      - name: Clean Up
-        run: |
-          docker stop arch-container
-          docker rm arch-container
