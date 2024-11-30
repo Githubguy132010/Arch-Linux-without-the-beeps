@@ -7,11 +7,22 @@ This repository provides a customized Arch Linux ISO with the system beeps disab
 
 ## Features
 
-- **Silent Mode**: The systemd-boot beep and other annoying beeps are completely disabled.
-- **Arch Linux Base**: Built on the latest Arch Linux, providing a clean and minimal system.
-- **Custom ISO**: Easily build and download a custom ISO with this configuration.
-- **Daily Automated Build**: ISO builds are automatically generated and released daily (if using GitHub Actions).
+- **Silent Mode**: Disables systemd-boot and other system beeps for a quieter experience.
+- **Arch Linux Base**: Utilizes the latest Arch Linux for a clean and minimal system.
+- **Custom ISO**: Provides an easy way to build and download a custom ISO.
+- **Automated Daily Builds**: Automatically generates and releases ISO builds daily using GitHub Actions.
 
+## Table of Contents
+
+- [Features](#features)
+- [How to Build the ISO Locally](#how-to-build-the-iso-locally)
+   - [Prerequisites](#prerequisites)
+   - [Steps to Build Locally](#steps-to-build-locally)
+- [How to Use GitHub Actions (Automated Workflow)](#how-to-use-github-actions-automated-workflow)
+   - [How It Works](#how-it-works)
+   - [GitHub Actions Workflow Overview](#github-actions-workflow-overview)
+   - [How to Trigger the GitHub Workflow](#how-to-trigger-the-github-workflow)
+- [License](#license)
 ---
 
 ## How to Build the ISO Locally
