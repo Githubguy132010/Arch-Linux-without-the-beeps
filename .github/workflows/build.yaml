@@ -45,7 +45,7 @@ jobs:
 
       - name: Get current date
         id: date
-        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
       # Create a release on GitHub using GITHUB_TOKEN
       - name: Create GitHub Release
