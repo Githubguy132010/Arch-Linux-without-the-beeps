@@ -16,79 +16,26 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Arch Linux Container
-        run: |
-          docker run --privileged --name arch-container -d -v ${{ github.workspace }}:/workdir archlinux:latest sleep infinity
-
-      - name: Build ISO in Arch Container
-        run: |
-          docker exec arch-container bash -c "
-            pacman -Syu --noconfirm &&
-            pacman -S --noconfirm git archiso grub &&
-            cd /workdir &&
+      - name: Build ISO in Arch Linux Container
+        uses: addnab/docker-run-action@v3
+        with:
+          image: archlinux:latest
+          options: >
+            --privileged
+            --workdir /workdir
+            -v ${{ github.workspace }}:/workdir
+          run: |
+            pacman -Syu --noconfirm
+            pacman -S --noconfirm git archiso grub
             mkarchiso -v -w workdir/ -o out/ .
-          "
 
-      - name: Rename ISO to Arch.iso
-        run: |
-          docker exec arch-container bash -c "
-            iso_file=\$(ls /workdir/out/*.iso 2>/dev/null | head -n 1) &&
-            [ -n \"\$iso_file\" ] && mv \$iso_file /workdir/out/Arch.iso || echo 'No ISO file found.'
-          "
-
-      - name: Copy ISO to Host
-        run: |
-          docker cp arch-container:/workdir/out/Arch.iso ${{ github.workspace }}/ || echo 'Failed to copy ISO to host.'
-
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1.1.4
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v3
         with:
-          tag_name: v${{ github.run_id }}-release
-          release_name: "Arch Linux Release"
-          body: "Arch Linux ISO built on ${{ steps.date.outputs.date }}"
-          draft: false
-          prerelease: false
+          name: Arch.iso
+          path: out/Arch.iso
 
-      - name: Upload ISO to GitHub Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/Arch.iso
-          asset_name: Arch.iso
-          asset_content_type: application/octet-stream
-
-      - name: Delete GitHub Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Delete ISO Artifact
+        if: always()
         run: |
-          release_id=$(curl -s \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/releases/tags/v${{ github.run_id }}-release | jq -r .id) &&
-          curl -X DELETE \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/releases/$release_id
-
-      - name: Delete Git Tag
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          curl -X DELETE \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/git/refs/tags/v${{ github.run_id }}-release
-
-      - name: Clean Up
-        run: |
-          docker stop arch-container || echo 'Failed to stop the container.'
-          docker rm arch-container || echo 'Failed to remove the container.'
+          rm -f out/Arch.iso
