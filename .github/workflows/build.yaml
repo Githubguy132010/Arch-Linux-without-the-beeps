@@ -28,7 +28,7 @@ jobs:
 
       - name: Get current date
         id: date
-        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
@@ -41,3 +41,19 @@ jobs:
           artifacts: out/Arch.iso
           draft: false
           prerelease: false
+
+      # Upload the ISO to the GitHub release with a specific, predictable name
+      - name: Upload ISO to GitHub Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ github.workspace }}/Arch.iso
+          asset_name: Arch.iso
+          asset_content_type: application/octet-stream
+
+      - name: Clean Up
+        run: |
+          docker stop arch-container || echo 'Failed to stop the container.'
+          docker rm arch-container || echo 'Failed to remove the container.'

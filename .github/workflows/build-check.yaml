@@ -28,9 +28,28 @@ jobs:
             pacman -Syu --noconfirm
             pacman -S --noconfirm git archiso grub
             mkarchiso -v -w workdir/ -o out/ .
+          "
 
-      - name: Upload ISO Artifact
-        uses: actions/upload-artifact@v3
+      - name: Rename ISO to Arch.iso
+        run: |
+          docker exec arch-container bash -c "
+            iso_file=\$(ls /workdir/out/*.iso 2>/dev/null | head -n 1) &&
+            [ -n \"\$iso_file\" ] && mv \$iso_file /workdir/out/Arch.iso || echo 'No ISO file found.'
+          "
+
+      - name: Copy ISO to Host
+        run: |
+          docker cp arch-container:/workdir/out/Arch.iso ${{ github.workspace }}/ || echo 'Failed to copy ISO to host.'
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1.1.4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           name: Arch.iso
           path: out/Arch.iso
