@@ -1,0 +1,133 @@
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    background-color: #2E3440; /* Nordic dark blue */
+    color: #D8DEE9; /* Nordic light text */
+    transition: background-color 0.3s, color 0.3s;
+}
+
+body.dark-mode {
+    background-color: #D8DEE9; /* Nordic light background */
+    color: #2E3440; /* Nordic dark text */
+}
+
+header {
+    background-color: #81A1C1; /* Nordic blue */
+    padding: 10px 0;
+    transition: background-color 0.3s, opacity 0.3s;
+    position: fixed;
+    width: 100%;
+    top: 0;
+}
+
+body.dark-mode header {
+    background-color: #4C566A; /* Nordic dark header */
+}
+
+body.scrolled header {
+    opacity: 0.9;
+}
+
+nav ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+}
+
+nav ul li {
+    margin: 0 15px;
+}
+
+nav ul li a {
+    color: #ECEFF4; /* Nordic lighter text */
+    text-decoration: none;
+    font-size: 18px;
+    transition: color 0.3s, border-bottom 0.3s;
+}
+
+body.dark-mode nav ul li a {
+    color: #2E3440; /* Nordic dark text */
+}
+
+nav ul li a:hover {
+    text-decoration: underline;
+    border-bottom: 2px solid #ECEFF4;
+}
+
+h1 {
+    color: #ECEFF4; /* Nordic lighter text */
+    transition: color 0.3s;
+}
+
+body.dark-mode h1 {
+    color: #2E3440; /* Nordic dark text */
+}
+
+h1, h2, p, a, button {
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+
+
+
+p {
+    color: #D8DEE9; /* Nordic light text */
+    font-size: 18px;
+    transition: color 0.3s;
+}
+
+body.dark-mode p {
+    color: #2E3440; /* Nordic dark text */
+}
+
+a {
+    color: #81A1C1; /* Nordic blue */
+    text-decoration: none;
+    font-size: 18px;
+    transition: color 0.3s, text-shadow 0.3s;
+}
+
+body.dark-mode a {
+    color: #5E81AC; /* Nordic dark link */
+}
+
+a:hover {
+    text-decoration: underline;
+    color: #88C0D0; /* Lichtere tint blauw */
+    text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+button {
+    background-color: #81A1C1; /* Nordic blue */
+    color: #ECEFF4; /* Nordic lighter text */
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.3s, color 0.3s, transform 0.3s;
+}
+
+button:hover {
+    background-color: #5E81AC; /* Darker Nordic blue */
+    transform: scale(1.05);
+}
+
+body.dark-mode button {
+    background-color: #4C566A; /* Nordic dark header */
+    color: #2E3440; /* Nordic dark text */
+}
+
+body.dark-mode button:hover {
+    background-color: #434C5E; /* Darker Nordic dark header */
+}
+
+/* Voeg keyframes toe voor fade-in effect */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
