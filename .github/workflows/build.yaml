@@ -63,7 +63,7 @@ jobs:
           tag_name: "v${{ github.run_id }}-release"
           release_name: "Arch Linux Release"
           body: |
-            This release contains the Arch Linux ISO built on ${{ env.DATE }}.
+            This release contains the Arch Linux ISO built on ${{ steps.date.outputs.DATE }}.
           draft: false
           prerelease: false
 
