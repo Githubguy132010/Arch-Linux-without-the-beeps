@@ -43,9 +43,15 @@ jobs:
         run: |
           docker cp arch-container:/workdir/out/Arch.iso ${{ github.workspace }}/ || echo 'Failed to copy ISO to host.'
 
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Arch.iso
+          path: ${{ github.workspace }}/Arch.iso
+
       - name: Get current date
         id: date
-        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+        run: echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
       # Create a release on GitHub using GITHUB_TOKEN
       - name: Create GitHub Release
@@ -54,10 +60,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ github.run_id }}-release
+          tag_name: "v${{ github.run_id }}-release"
           release_name: "Arch Linux Release"
           body: |
-            This release contains the Arch Linux ISO built on ${{ steps.date.outputs.date }}.
+            This release contains the Arch Linux ISO built on ${{ env.DATE }}.
           draft: false
           prerelease: false
 
