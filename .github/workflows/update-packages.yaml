@@ -20,43 +20,53 @@ jobs:
 
       - name: Set up Docker
         run: |
-          docker run --name arch-container -d archlinux:latest sleep infinity
+          docker run --name arch-container -d \
+            -v ${{ github.workspace }}:/workdir \
+            archlinux:latest sleep infinity
+
+      - name: Initialize Container
+        run: |
+          docker exec arch-container bash -c "
+            pacman -Sy --noconfirm
+            pacman -S --noconfirm --needed curl jq
+          "
 
       - name: Check for Package Updates
         id: check-updates
         run: |
-          # Create temporary files
-          touch new-packages.txt current-packages.txt updates.txt
+          # Create temporary files in workspace
+          touch current-packages.txt updates.txt
           
           # Get current packages
-          cat packages.x86_64 | grep -v '^#' | grep -v '^$' > current-packages.txt
+          grep -v '^#' packages.x86_64 | grep -v '^$' > current-packages.txt
           
           # Check each package for updates
           docker exec arch-container bash -c "
+            set -euo pipefail
+            cd /workdir
+            
+            # Initialize pacman
             pacman -Sy
+            
+            # Process each package
             while read -r pkg; do
-              if pacman -Si \$pkg >/dev/null 2>&1; then
-                echo \$pkg >> /tmp/new-packages.txt
+              if pacman -Si \"\$pkg\" >/dev/null 2>&1; then
+                current_ver=\$(pacman -Si \"\$pkg\" | grep Version | head -n1 | awk '{print \$3}')
+                echo \"\$pkg \$current_ver\" >> updates.txt
+              else
+                echo \"Warning: Package \$pkg not found in repositories\"
               fi
-            done < /workdir/current-packages.txt
+            done < current-packages.txt
           "
           
-          # Compare versions and create update list
-          docker exec arch-container bash -c "
-            while read -r pkg; do
-              current_ver=\$(pacman -Si \$pkg | grep Version | head -n1 | awk '{print \$3}')
-              echo \"\$pkg \$current_ver\" >> /tmp/updates.txt
-            done < /tmp/new-packages.txt
-          "
-          
-          # Copy files back
-          docker cp arch-container:/tmp/updates.txt .
-          
-          # Set output
+          # Check if we have updates
           if [ -s updates.txt ]; then
             echo "updates_available=true" >> $GITHUB_OUTPUT
+            echo "Found updates:"
+            cat updates.txt
           else
             echo "updates_available=false" >> $GITHUB_OUTPUT
+            echo "No updates found"
           fi
 
       - name: Create Pull Request
@@ -87,4 +97,4 @@ jobs:
         run: |
           docker stop arch-container || true
           docker rm arch-container || true
-          rm -f updates.txt new-packages.txt current-packages.txt
+          rm -f current-packages.txt updates.txt

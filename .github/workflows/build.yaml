@@ -25,25 +25,20 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          buildkitd-flags: --debug
-
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
       - name: Set up environment variables
         id: env
         run: |
           echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           echo "VERSION=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
           echo "CACHE_KEY=$(date +'%Y-%m')" >> $GITHUB_ENV
+          echo "WORKSPACE=${GITHUB_WORKSPACE}" >> $GITHUB_ENV
+
+      - name: Create Cache Directories
+        run: |
+          sudo mkdir -p /tmp/pacman-cache
+          sudo chmod 777 /tmp/pacman-cache
+          sudo mkdir -p /tmp/build-cache
+          sudo chmod 777 /tmp/build-cache
 
       - name: Cache Pacman packages
         uses: actions/cache@v3
@@ -55,18 +50,36 @@ jobs:
 
       - name: Set up Arch Linux Container
         run: |
-          mkdir -p /tmp/pacman-cache
           docker run --privileged --name arch-container -d \
-            -v ${{ github.workspace }}:/workdir \
+            -v ${{ env.WORKSPACE }}:/workdir \
             -v /tmp/pacman-cache:/var/cache/pacman/pkg \
+            -v /tmp/build-cache:/var/cache/pacman/pkg \
             archlinux:latest sleep infinity
 
-      - name: Update and Install Dependencies
+      - name: Initialize Container
         run: |
           docker exec arch-container bash -c "
             set -euo pipefail
+            
+            # Update package database
             pacman -Sy --noconfirm
-            pacman -S --noconfirm --needed git archiso grub curl jq gnupg
+            
+            # Install required packages
+            pacman -S --noconfirm --needed \
+              git \
+              archiso \
+              grub \
+              curl \
+              jq \
+              gnupg \
+              make \
+              sudo
+            
+            # Verify installation
+            command -v mkarchiso >/dev/null 2>&1 || {
+              echo 'Error: mkarchiso not found'
+              exit 1
+            }
           "
 
       - name: Build ISO
@@ -75,11 +88,21 @@ jobs:
           docker exec arch-container bash -c "
             set -euo pipefail
             cd /workdir
+            
             # Cleanup any previous builds
             rm -rf workdir/ out/
+            mkdir -p out/
+            
             # Build the ISO with verbose output
-            mkarchiso -v -w workdir/ -o out/ . || {
-              echo 'ISO build failed!'
+            mkarchiso -v -w workdir/ -o out/ . 2>&1 | tee build.log || {
+              echo 'Error: ISO build failed!'
+              tail -n 50 build.log
+              exit 1
+            }
+            
+            # Verify ISO was created
+            [ -f out/*.iso ] || {
+              echo 'Error: ISO file not found after build'
               exit 1
             }
           "
@@ -87,17 +110,27 @@ jobs:
       - name: Generate Checksums
         run: |
           docker exec arch-container bash -c "
+            set -euo pipefail
             cd /workdir/out
-            sha256sum *.iso > sha256sums.txt
-            sha512sum *.iso > sha512sums.txt
+            
+            # Generate checksums
+            for iso in *.iso; do
+              sha256sum \"\$iso\" > \"\${iso}.sha256sum\"
+              sha512sum \"\$iso\" > \"\${iso}.sha512sum\"
+            done
           "
 
       - name: Rename and Move ISO
         run: |
           docker exec arch-container bash -c "
+            set -euo pipefail
             cd /workdir/out
+            
             for f in *.iso; do
-              mv \"\$f\" \"arch-linux-no-beeps-${{ env.VERSION }}.iso\"
+              newname=\"arch-linux-no-beeps-${{ env.VERSION }}.iso\"
+              mv \"\$f\" \"\$newname\"
+              mv \"\$f.sha256sum\" \"\$newname.sha256sum\"
+              mv \"\$f.sha512sum\" \"\$newname.sha512sum\"
             done
           "
 
@@ -106,8 +139,8 @@ jobs:
         with:
           name: arch-linux-no-beeps-${{ env.VERSION }}
           path: |
-            ${{ github.workspace }}/out/*.iso
-            ${{ github.workspace }}/out/sha*sums.txt
+            ${{ env.WORKSPACE }}/out/*.iso
+            ${{ env.WORKSPACE }}/out/*.sha*sum
           retention-days: 5
 
       - name: Create Release
@@ -133,17 +166,21 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            ${{ github.workspace }}/out/*.iso
-            ${{ github.workspace }}/out/sha*sums.txt
+            ${{ env.WORKSPACE }}/out/*.iso
+            ${{ env.WORKSPACE }}/out/*.sha*sum
 
       - name: Clean Up
         if: always()
         run: |
           docker stop arch-container || true
           docker rm arch-container || true
-          rm -rf workdir/ out/
+          sudo rm -rf workdir/ out/ /tmp/build-cache/*
 
-      - name: Notify on Failure
+      - name: Upload Build Logs on Failure
         if: failure()
-        run: |
-          echo "::error::ISO build failed! Check the logs for more details."
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-logs
+          path: |
+            ${{ env.WORKSPACE }}/build.log
+          retention-days: 5
