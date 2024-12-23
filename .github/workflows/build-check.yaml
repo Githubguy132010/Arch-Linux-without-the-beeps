@@ -11,6 +11,10 @@ on:
 
 env:
   DOCKER_BUILDKIT: 1
+  PACMAN_CACHE: /tmp/pacman-cache
+  WORKSPACE: /workdir
+  BUILD_DIR: /workdir/workdir
+  OUTPUT_DIR: /workdir/out
 
 jobs:
   validate:
@@ -21,6 +25,12 @@ jobs:
 
       - name: Validate package list
         run: |
+          # Check if package list exists
+          if [ ! -f packages.x86_64 ]; then
+            echo "::error::packages.x86_64 file not found"
+            exit 1
+          fi
+
           # Check for duplicate packages
           sort packages.x86_64 | uniq -d > duplicates.txt
           if [ -s duplicates.txt ]; then
@@ -31,14 +41,15 @@ jobs:
           
           # Validate package names exist in Arch repos
           docker run --rm archlinux:latest bash -c "
-            pacman -Sy
+            set -euo pipefail
+            pacman -Syu --noconfirm
             while read -r pkg; do
               [[ \$pkg =~ ^# ]] && continue
               [[ -z \$pkg ]] && continue
-              pacman -Si \$pkg >/dev/null 2>&1 || {
+              if ! pacman -Si \$pkg >/dev/null 2>&1; then
                 echo \"::error::Package not found: \$pkg\"
                 exit 1
-              }
+              fi
             done < packages.x86_64
           "
 
@@ -75,24 +86,24 @@ jobs:
       - name: Cache Pacman packages
         uses: actions/cache@v3
         with:
-          path: /tmp/pacman-cache
-          key: pacman-test-${{ github.sha }}
+          path: ${{ env.PACMAN_CACHE }}
+          key: pacman-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
-            pacman-test-
+            pacman-${{ runner.os }}-
 
       - name: Set up Arch Linux Container
         run: |
-          mkdir -p /tmp/pacman-cache
+          mkdir -p ${{ env.PACMAN_CACHE }}
           docker run --privileged --name arch-container -d \
-            -v ${{ github.workspace }}:/workdir \
-            -v /tmp/pacman-cache:/var/cache/pacman/pkg \
+            -v ${{ github.workspace }}:${{ env.WORKSPACE }} \
+            -v ${{ env.PACMAN_CACHE }}:/var/cache/pacman/pkg \
             archlinux:latest sleep infinity
 
       - name: Install Dependencies
         run: |
           docker exec arch-container bash -c "
             set -euo pipefail
-            pacman -Sy --noconfirm
+            pacman -Syu --noconfirm
             pacman -S --noconfirm --needed git archiso grub
           "
 
@@ -101,24 +112,41 @@ jobs:
         run: |
           docker exec arch-container bash -c "
             set -euo pipefail
-            cd /workdir
-            rm -rf workdir/ out/
-            mkarchiso -v -w workdir/ -o out/ .
+            cd ${{ env.WORKSPACE }}
+            rm -rf ${{ env.BUILD_DIR }} ${{ env.OUTPUT_DIR }}
+            mkdir -p ${{ env.BUILD_DIR }} ${{ env.OUTPUT_DIR }}
+            mkarchiso -v -w ${{ env.BUILD_DIR }} -o ${{ env.OUTPUT_DIR }} .
           "
 
       - name: Verify ISO
         run: |
           docker exec arch-container bash -c "
-            cd /workdir/out
+            set -euo pipefail
+            cd ${{ env.OUTPUT_DIR }}
+            
             # Check if ISO exists
-            [ -f *.iso ] || {
-              echo '::error::ISO file not found'
+            iso_count=\$(ls -1 *.iso 2>/dev/null | wc -l)
+            if [ \$iso_count -eq 0 ]; then
+              echo '::error::No ISO file found'
               exit 1
-            }
+            elif [ \$iso_count -gt 1 ]; then
+              echo '::error::Multiple ISO files found'
+              exit 1
+            fi
+            
+            iso_file=\$(ls *.iso)
+            
             # Check ISO size (minimum 500MB)
-            size=\$(stat -c%s *.iso)
-            [ \$size -gt 524288000 ] || {
-              echo '::error::ISO file too small'
+            size=\$(stat -c%s \"\$iso_file\")
+            if [ \$size -lt 524288000 ]; then
+              echo \"::error::ISO file too small: \$((\$size / 1024 / 1024))MB\"
+              exit 1
+            fi
+            
+            # Verify ISO checksum
+            sha256sum \"\$iso_file\" > checksum.sha256
+            sha256sum -c checksum.sha256 || {
+              echo '::error::ISO checksum verification failed'
               exit 1
             }
           "
@@ -126,9 +154,11 @@ jobs:
       - name: Clean Up
         if: always()
         run: |
-          docker stop arch-container || true
-          docker rm arch-container || true
-          rm -rf workdir/ out/
+          if docker ps -a | grep -q arch-container; then
+            docker stop arch-container || true
+            docker rm -f arch-container || true
+          fi
+          sudo rm -rf ${{ env.BUILD_DIR }} ${{ env.OUTPUT_DIR }}
 
       - name: Report Status
         if: always()
