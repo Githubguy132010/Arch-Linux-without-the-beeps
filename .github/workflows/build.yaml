@@ -133,6 +133,56 @@ jobs:
             done
           "
 
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          # Create a temporary file for release notes
+          TEMP_RELEASE_NOTES=$(mktemp)
+          
+          docker exec arch-container bash -c "
+            set -euo pipefail
+            cd /workdir
+            
+            # Initialize release notes
+            {
+              echo '🚀 Arch Linux ISO without system beeps (build ${{ env.DATE }})'
+              echo ''
+              echo '### Changes'
+              
+              # Get changes since last release
+              if git tag | grep -q .; then
+                LAST_TAG=\$(git describe --tags --abbrev=0 2>/dev/null || echo '')
+                if [ ! -z \"\$LAST_TAG\" ]; then
+                  echo '#### Commits since last release:'
+                  git log \"\$LAST_TAG\"..HEAD --pretty=format:'- %s' | grep -v 'Merge'
+                  echo ''
+                fi
+              fi
+              
+              # Add standard information
+              echo '### Features'
+              echo '- Automatic daily build'
+              echo '- System beeps disabled'
+              echo '- ISO SHA256 and SHA512 checksums included'
+              echo ''
+              echo '### Download'
+              echo '- Download the ISO and verify checksums before use'
+              echo ''
+              echo '### Checksums'
+              echo 'SHA256 and SHA512 checksums are available in the uploaded files.'
+            } > /tmp/release_notes
+          "
+          
+          # Copy release notes from container to host
+          docker cp arch-container:/tmp/release_notes $TEMP_RELEASE_NOTES
+          
+          # Set the release notes in GITHUB_ENV
+          echo 'RELEASE_NOTES<<EOF' >> $GITHUB_ENV
+          cat $TEMP_RELEASE_NOTES >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+          
+          # Cleanup
+          rm -f $TEMP_RELEASE_NOTES
 
       - name: Create Release
         id: create_release
@@ -141,19 +191,7 @@ jobs:
         with:
           tag_name: v${{ env.VERSION }}
           name: "Arch Linux No Beeps v${{ env.VERSION }}"
-          body: |
-            🚀 Arch Linux ISO without system beeps (build ${{ env.DATE }})
-            
-            ### Changes
-            - Automatic daily build
-            - System beeps disabled
-            - ISO SHA256 and SHA512 checksums added
-            
-            ### Download
-            - Download the ISO and verify checksums before use
-            
-            ### Checksums
-            SHA256 and SHA512 checksums are available in the uploaded files.
+          body: ${{ env.RELEASE_NOTES }}
           draft: false
           prerelease: false
           files: |
