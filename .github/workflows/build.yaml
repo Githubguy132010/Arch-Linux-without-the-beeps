@@ -37,8 +37,6 @@ jobs:
         run: |
           sudo mkdir -p /tmp/pacman-cache
           sudo chmod 777 /tmp/pacman-cache
-          sudo mkdir -p /tmp/build-cache
-          sudo chmod 777 /tmp/build-cache
 
       - name: Cache Pacman packages
         uses: actions/cache@v3
@@ -53,7 +51,6 @@ jobs:
           docker run --privileged --name arch-container -d \
             -v ${{ env.WORKSPACE }}:/workdir \
             -v /tmp/pacman-cache:/var/cache/pacman/pkg \
-            -v /tmp/build-cache:/var/cache/pacman/pkg \
             archlinux:latest sleep infinity
 
       - name: Initialize Container
@@ -174,7 +171,7 @@ jobs:
         run: |
           docker stop arch-container || true
           docker rm arch-container || true
-          sudo rm -rf workdir/ out/ /tmp/build-cache/*
+          sudo rm -rf workdir/ out/ /tmp/pacman-cache/*
 
       - name: Upload Build Logs on Failure
         if: failure()

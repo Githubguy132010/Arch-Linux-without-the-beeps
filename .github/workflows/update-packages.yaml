@@ -18,15 +18,36 @@ jobs:
         with:
           ref: dev
 
+      - name: Set up environment variables
+        id: env
+        run: |
+          echo "WORKSPACE=${GITHUB_WORKSPACE}" >> $GITHUB_ENV
+          echo "CACHE_KEY=$(date +'%Y-%m')" >> $GITHUB_ENV
+
+      - name: Create Cache Directory
+        run: |
+          sudo mkdir -p /tmp/pacman-cache
+          sudo chmod 777 /tmp/pacman-cache
+
+      - name: Cache Pacman packages
+        uses: actions/cache@v3
+        with:
+          path: /tmp/pacman-cache
+          key: pacman-${{ env.CACHE_KEY }}
+          restore-keys: |
+            pacman-
+
       - name: Set up Docker
         run: |
           docker run --name arch-container -d \
-            -v ${{ github.workspace }}:/workdir \
+            -v ${{ env.WORKSPACE }}:/workdir \
+            -v /tmp/pacman-cache:/var/cache/pacman/pkg \
             archlinux:latest sleep infinity
 
       - name: Initialize Container
         run: |
           docker exec arch-container bash -c "
+            set -euo pipefail
             pacman -Sy --noconfirm
             pacman -S --noconfirm --needed curl jq
           "
@@ -98,3 +119,4 @@ jobs:
           docker stop arch-container || true
           docker rm arch-container || true
           rm -f current-packages.txt updates.txt
+          sudo rm -rf /tmp/pacman-cache/*
