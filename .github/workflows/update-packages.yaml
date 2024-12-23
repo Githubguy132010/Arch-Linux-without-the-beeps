@@ -39,7 +39,7 @@ jobs:
 
       - name: Set up Docker
         run: |
-          docker run --name arch-container -d \
+          docker run --privileged --name arch-container -d \
             -v ${{ env.WORKSPACE }}:/workdir \
             -v /tmp/pacman-cache:/var/cache/pacman/pkg \
             archlinux:latest sleep infinity
@@ -48,23 +48,27 @@ jobs:
         run: |
           docker exec arch-container bash -c "
             set -euo pipefail
+            cd /workdir
+            
+            # Update package database
             pacman -Sy --noconfirm
+            
+            # Install required packages
             pacman -S --noconfirm --needed curl jq
           "
 
       - name: Check for Package Updates
         id: check-updates
         run: |
-          # Create temporary files in workspace
-          touch current-packages.txt updates.txt
-          
-          # Get current packages
-          grep -v '^#' packages.x86_64 | grep -v '^$' > current-packages.txt
-          
-          # Check each package for updates
           docker exec arch-container bash -c "
             set -euo pipefail
             cd /workdir
+            
+            # Create temporary files in workspace
+            touch current-packages.txt updates.txt
+            
+            # Get current packages
+            grep -v '^#' packages.x86_64 | grep -v '^$' > current-packages.txt
             
             # Initialize pacman
             pacman -Sy
@@ -78,17 +82,17 @@ jobs:
                 echo \"Warning: Package \$pkg not found in repositories\"
               fi
             done < current-packages.txt
+            
+            # Check if we have updates
+            if [ -s updates.txt ]; then
+              echo 'updates_available=true' >> \$GITHUB_OUTPUT
+              echo 'Found updates:'
+              cat updates.txt
+            else
+              echo 'updates_available=false' >> \$GITHUB_OUTPUT
+              echo 'No updates found'
+            fi
           "
-          
-          # Check if we have updates
-          if [ -s updates.txt ]; then
-            echo "updates_available=true" >> $GITHUB_OUTPUT
-            echo "Found updates:"
-            cat updates.txt
-          else
-            echo "updates_available=false" >> $GITHUB_OUTPUT
-            echo "No updates found"
-          fi
 
       - name: Create Pull Request
         if: steps.check-updates.outputs.updates_available == 'true'
@@ -118,5 +122,4 @@ jobs:
         run: |
           docker stop arch-container || true
           docker rm arch-container || true
-          rm -f current-packages.txt updates.txt
           sudo rm -rf /tmp/pacman-cache/*
