@@ -133,6 +133,42 @@ jobs:
             done
           "
 
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          docker exec arch-container bash -c "
+            set -euo pipefail
+            cd /workdir
+            
+            # Initialize release notes
+            echo 'RELEASE_NOTES<<EOF' >> \$GITHUB_ENV
+            echo '🚀 Arch Linux ISO without system beeps (build ${{ env.DATE }})' >> \$GITHUB_ENV
+            echo '' >> \$GITHUB_ENV
+            echo '### Changes' >> \$GITHUB_ENV
+            
+            # Get changes since last release
+            if git tag | grep -q .; then
+              LAST_TAG=\$(git describe --tags --abbrev=0 2>/dev/null || echo '')
+              if [ ! -z \"\$LAST_TAG\" ]; then
+                echo '#### Commits since last release:' >> \$GITHUB_ENV
+                git log \"\$LAST_TAG\"..HEAD --pretty=format:'- %s' | grep -v 'Merge' >> \$GITHUB_ENV
+                echo '' >> \$GITHUB_ENV
+              fi
+            fi
+            
+            # Add standard information
+            echo '### Features' >> \$GITHUB_ENV
+            echo '- Automatic daily build' >> \$GITHUB_ENV
+            echo '- System beeps disabled' >> \$GITHUB_ENV
+            echo '- ISO SHA256 and SHA512 checksums included' >> \$GITHUB_ENV
+            echo '' >> \$GITHUB_ENV
+            echo '### Download' >> \$GITHUB_ENV
+            echo '- Download the ISO and verify checksums before use' >> \$GITHUB_ENV
+            echo '' >> \$GITHUB_ENV
+            echo '### Checksums' >> \$GITHUB_ENV
+            echo 'SHA256 and SHA512 checksums are available in the uploaded files.' >> \$GITHUB_ENV
+            echo 'EOF' >> \$GITHUB_ENV
+          "
 
       - name: Create Release
         id: create_release
@@ -141,19 +177,7 @@ jobs:
         with:
           tag_name: v${{ env.VERSION }}
           name: "Arch Linux No Beeps v${{ env.VERSION }}"
-          body: |
-            🚀 Arch Linux ISO without system beeps (build ${{ env.DATE }})
-            
-            ### Changes
-            - Automatic daily build
-            - System beeps disabled
-            - ISO SHA256 and SHA512 checksums added
-            
-            ### Download
-            - Download the ISO and verify checksums before use
-            
-            ### Checksums
-            SHA256 and SHA512 checksums are available in the uploaded files.
+          body: ${{ env.RELEASE_NOTES }}
           draft: false
           prerelease: false
           files: |
