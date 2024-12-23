@@ -40,7 +40,7 @@ jobs:
           fi
           
           # Validate package names exist in Arch repos
-          docker run --rm archlinux:latest bash -c "
+          docker run --rm -v "${{ github.workspace }}/packages.x86_64:/packages.x86_64:ro" archlinux:latest bash -c "
             set -euo pipefail
             pacman -Syu --noconfirm
             while read -r pkg; do
@@ -50,7 +50,7 @@ jobs:
                 echo \"::error::Package not found: \$pkg\"
                 exit 1
               fi
-            done < packages.x86_64
+            done < /packages.x86_64
           "
 
   security-scan:
