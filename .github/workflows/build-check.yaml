@@ -1,94 +1,171 @@
-name: Check if ISO can be built
+name: Validate and Test Build
 
 on:
   pull_request:
     branches:
       - main
+      - dev
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * *'
 
+env:
+  DOCKER_BUILDKIT: 1
+  PACMAN_CACHE: /tmp/pacman-cache
+  WORKSPACE: /workdir
+  BUILD_DIR: /workdir/workdir
+  OUTPUT_DIR: /workdir/out
+
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Validate package list
+        run: |
+          # Check if package list exists
+          if [ ! -f packages.x86_64 ]; then
+            echo "::error::packages.x86_64 file not found"
+            exit 1
+          fi
+
+          # Check for duplicate packages
+          sort packages.x86_64 | uniq -d > duplicates.txt
+          if [ -s duplicates.txt ]; then
+            echo "::error::Duplicate packages found:"
+            cat duplicates.txt
+            exit 1
+          fi
+          
+          # Validate package names exist in Arch repos
+          docker run --rm -v "${{ github.workspace }}/packages.x86_64:/packages.x86_64:ro" archlinux:latest bash -c "
+            set -euo pipefail
+            pacman -Syu --noconfirm
+            while read -r pkg; do
+              [[ \$pkg =~ ^# ]] && continue
+              [[ -z \$pkg ]] && continue
+              if ! pacman -Si \$pkg >/dev/null 2>&1; then
+                echo \"::error::Package not found: \$pkg\"
+                exit 1
+              fi
+            done < /packages.x86_64
+          "
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Run Security Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Scan Results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  test-build:
+    needs: [validate, security-scan]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Cache Pacman packages
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.PACMAN_CACHE }}
+          key: pacman-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            pacman-${{ runner.os }}-
+
       - name: Set up Arch Linux Container
         run: |
-          docker run --privileged --name arch-container -d -v ${{ github.workspace }}:/workdir archlinux:latest sleep infinity
+          mkdir -p ${{ env.PACMAN_CACHE }}
+          docker run --privileged --name arch-container -d \
+            -v ${{ github.workspace }}:${{ env.WORKSPACE }} \
+            -v ${{ env.PACMAN_CACHE }}:/var/cache/pacman/pkg \
+            archlinux:latest sleep infinity
 
-      - name: Build ISO in Arch Container
+      - name: Install Dependencies
         run: |
           docker exec arch-container bash -c "
-            pacman -Syu --noconfirm &&
-            pacman -S --noconfirm git archiso grub &&
-            cd /workdir &&
-            mkarchiso -v -w workdir/ -o out/ .
+            set -euo pipefail
+            pacman -Syu --noconfirm
+            pacman -S --noconfirm --needed git archiso grub
           "
 
-      - name: Rename ISO to Arch.iso
+      - name: Test Build
+        id: build
         run: |
           docker exec arch-container bash -c "
-            iso_file=\$(ls /workdir/out/*.iso 2>/dev/null | head -n 1) &&
-            [ -n \"\$iso_file\" ] && mv \$iso_file /workdir/out/Arch.iso || echo 'No ISO file found.'
+            set -euo pipefail
+            cd ${{ env.WORKSPACE }}
+            rm -rf ${{ env.BUILD_DIR }} ${{ env.OUTPUT_DIR }}
+            mkdir -p ${{ env.BUILD_DIR }} ${{ env.OUTPUT_DIR }}
+            mkarchiso -v -w ${{ env.BUILD_DIR }} -o ${{ env.OUTPUT_DIR }} .
           "
 
-      - name: Copy ISO to Host
+      - name: Verify ISO
         run: |
-          docker cp arch-container:/workdir/out/Arch.iso ${{ github.workspace }}/ || echo 'Failed to copy ISO to host.'
-
-      - name: Get current date
-        id: date
-        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
-
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1.1.4
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ github.run_id }}-release
-          release_name: "Arch Linux Release"
-          body: "Arch Linux ISO built on ${{ steps.date.outputs.date }}"
-          draft: false
-          prerelease: false
-
-      - name: Upload ISO to GitHub Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ github.workspace }}/Arch.iso
-          asset_name: Arch.iso
-          asset_content_type: application/octet-stream
-
-      - name: Delete GitHub Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          release_id=$(curl -s \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/releases/tags/v${{ github.run_id }}-release | jq -r .id) &&
-          curl -X DELETE \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/releases/$release_id
-
-      - name: Delete Git Tag
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          curl -X DELETE \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/git/refs/tags/v${{ github.run_id }}-release
+          docker exec arch-container bash -c "
+            set -euo pipefail
+            cd ${{ env.OUTPUT_DIR }}
+            
+            # Check if ISO exists
+            iso_count=\$(ls -1 *.iso 2>/dev/null | wc -l)
+            if [ \$iso_count -eq 0 ]; then
+              echo '::error::No ISO file found'
+              exit 1
+            elif [ \$iso_count -gt 1 ]; then
+              echo '::error::Multiple ISO files found'
+              exit 1
+            fi
+            
+            iso_file=\$(ls *.iso)
+            
+            # Check ISO size (minimum 500MB)
+            size=\$(stat -c%s \"\$iso_file\")
+            if [ \$size -lt 524288000 ]; then
+              echo \"::error::ISO file too small: \$((\$size / 1024 / 1024))MB\"
+              exit 1
+            fi
+            
+            # Verify ISO checksum
+            sha256sum \"\$iso_file\" > checksum.sha256
+            sha256sum -c checksum.sha256 || {
+              echo '::error::ISO checksum verification failed'
+              exit 1
+            }
+          "
 
       - name: Clean Up
+        if: always()
         run: |
-          docker stop arch-container || echo 'Failed to stop the container.'
-          docker rm arch-container || echo 'Failed to remove the container.'
+          if docker ps -a | grep -q arch-container; then
+            docker stop arch-container || true
+            docker rm -f arch-container || true
+          fi
+          sudo rm -rf ${{ env.BUILD_DIR }} ${{ env.OUTPUT_DIR }}
+
+      - name: Report Status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Build check passed successfully"
+          else
+            echo "❌ Build check failed"
+            exit 1
+          fi
