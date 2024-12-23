@@ -44,7 +44,7 @@ jobs:
           docker cp arch-container:/workdir/out/Arch.iso ${{ github.workspace }}/ || echo 'Failed to copy ISO to host.'
 
       - name: Upload ISO Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Arch.iso
           path: ${{ github.workspace }}/Arch.iso
