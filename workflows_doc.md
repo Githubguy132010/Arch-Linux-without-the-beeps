@@ -28,15 +28,6 @@ Triggered by:
 - ⏰ Scheduled: `0 0 * * *`
 - 🔄 Pull request
 
-### Build ISO
-
-File: `build.yaml`
-
-Triggered by:
-- 🔘 Manual trigger
-- ⏰ Scheduled: `0 0 * * *`
-- 📤 Push to repository
-
 ### Create Release
 
 File: `create-release.yaml`
