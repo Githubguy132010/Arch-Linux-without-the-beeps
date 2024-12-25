@@ -1,0 +1,35 @@
+name: Build Arch Linux ISO
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Run the workflow every day at midnight
+  workflow_dispatch:      # Manual trigger option
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm archiso git
+          
+      - name: Build ISO
+        run: |
+          mkdir -p work out
+          cp -r /usr/share/archiso/configs/releng/* work/
+          cp -r * work/airootfs/ || true
+          mkarchiso -v -w work/ -o out/ work/
+
+      - name: Upload ISO
+        uses: actions/upload-artifact@v3
+        with:
+          name: arch-linux-iso
+          path: out/*.iso
+          retention-days: 5

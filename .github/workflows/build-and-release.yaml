@@ -1,0 +1,217 @@
+name: Build ISO
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'  # Run the workflow every day at midnight
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+
+env:
+  DOCKER_BUILDKIT: 1
+  ISO_FILENAME: Arch.iso
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # Set a timeout to prevent hung builds
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up environment variables
+        id: env
+        run: |
+          echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+          echo "VERSION=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
+          echo "CACHE_KEY=$(date +'%Y-%m')" >> $GITHUB_ENV
+          echo "WORKSPACE=${GITHUB_WORKSPACE}" >> $GITHUB_ENV
+
+      - name: Create Cache Directories
+        run: |
+          sudo mkdir -p /tmp/pacman-cache
+          sudo chmod 777 /tmp/pacman-cache
+          # Ensure the directory is empty to prevent tar errors
+          sudo rm -rf /tmp/pacman-cache/*
+
+      - name: Cache Pacman packages
+        uses: actions/cache@v3
+        with:
+          path: /tmp/pacman-cache
+          key: pacman-${{ runner.os }}-${{ env.CACHE_KEY }}
+          restore-keys: |
+            pacman-${{ runner.os }}-
+
+      - name: Set up Arch Linux Container
+        run: |
+          docker run --privileged --name arch-container -d \
+            -v ${{ env.WORKSPACE }}:/workdir \
+            -v /tmp/pacman-cache:/var/cache/pacman/pkg \
+            archlinux:latest sleep infinity
+
+      - name: Initialize Container
+        run: |
+          docker exec arch-container bash -c "
+            set -euo pipefail
+            
+            # Update package database and system
+            pacman -Syu --noconfirm
+            
+            # Install required packages
+            pacman -S --noconfirm --needed \
+              git \
+              archiso \
+              grub \
+              curl \
+              jq \
+              gnupg \
+              make \
+              sudo
+            
+            # Verify installation
+            command -v mkarchiso >/dev/null 2>&1 || {
+              echo '::error::mkarchiso not found'
+              exit 1
+            }
+          "
+
+      - name: Build ISO
+        id: build
+        run: |
+          docker exec arch-container bash -c "
+            set -euo pipefail
+            cd /workdir
+            
+            # Cleanup any previous builds
+            rm -rf workdir/ out/
+            mkdir -p out/
+            
+            # Build the ISO with verbose output
+            mkarchiso -v -w workdir/ -o out/ . 2>&1 | tee build.log || {
+              echo '::error::ISO build failed!'
+              tail -n 50 build.log
+              exit 1
+            }
+            
+            # Verify ISO was created
+            [ -f out/*.iso ] || {
+              echo '::error::ISO file not found after build'
+              exit 1
+            }
+          "
+
+      - name: Generate Checksums
+        run: |
+          docker exec arch-container bash -c "
+            set -euo pipefail
+            cd /workdir/out
+            
+            # Generate checksums
+            for iso in *.iso; do
+              sha256sum \"\$iso\" > \"\${iso}.sha256sum\"
+              sha512sum \"\$iso\" > \"\${iso}.sha512sum\"
+            done
+          "
+
+      - name: Rename and Move ISO
+        run: |
+          docker exec arch-container bash -c "
+            set -euo pipefail
+            cd /workdir/out
+            
+            for f in *.iso; do
+              newname=\"arch-linux-no-beeps-${{ env.VERSION }}.iso\"
+              mv \"\$f\" \"\$newname\"
+              mv \"\$f.sha256sum\" \"\$newname.sha256sum\"
+              mv \"\$f.sha512sum\" \"\$newname.sha512sum\"
+            done
+          "
+
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          # Create a temporary file for release notes
+          TEMP_RELEASE_NOTES=$(mktemp)
+          
+          docker exec arch-container bash -c "
+            set -euo pipefail
+            cd /workdir
+            
+            # Initialize release notes
+            {
+              echo '🚀 Arch Linux ISO without system beeps (build ${{ env.DATE }})'
+              echo ''
+              echo '### Changes'
+              
+              # Get changes since last release
+              if git tag | grep -q .; then
+                LAST_TAG=\$(git describe --tags --abbrev=0 2>/dev/null || echo '')
+                if [ ! -z \"\$LAST_TAG\" ]; then
+                  echo '#### Commits since last release:'
+                  git log \"\$LAST_TAG\"..HEAD --pretty=format:'- %s' | grep -v 'Merge'
+                  echo ''
+                fi
+              fi
+              
+              # Add standard information
+              echo '### Features'
+              echo '- Automatic daily build'
+              echo '- System beeps disabled'
+              echo '- ISO SHA256 and SHA512 checksums included'
+              echo ''
+              echo '### Download'
+              echo '- Download the ISO and verify checksums before use'
+              echo ''
+              echo '### Checksums'
+              echo 'SHA256 and SHA512 checksums are available in the uploaded files.'
+            } > /tmp/release_notes
+          "
+          
+          # Copy release notes from container to host
+          docker cp arch-container:/tmp/release_notes $TEMP_RELEASE_NOTES
+          
+          # Set the release notes in GITHUB_ENV
+          echo 'RELEASE_NOTES<<EOF' >> $GITHUB_ENV
+          cat $TEMP_RELEASE_NOTES >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+          
+          # Cleanup
+          rm -f $TEMP_RELEASE_NOTES
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: "Arch Linux No Beeps v${{ env.VERSION }}"
+          body: ${{ env.RELEASE_NOTES }}
+          draft: false
+          prerelease: false
+          files: |
+            ${{ env.WORKSPACE }}/out/*.iso
+            ${{ env.WORKSPACE }}/out/*.sha*sum
+
+      - name: Clean Up
+        if: always()
+        run: |
+          if docker ps -a | grep -q arch-container; then
+            docker stop arch-container || true
+            docker rm -f arch-container || true
+          fi
+          sudo rm -rf workdir/ out/ /tmp/pacman-cache/*
+
+      - name: Upload Build Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4  # Upgrade to v4
+        with:
+          name: build-logs
+          path: |
+            ${{ env.WORKSPACE }}/build.log
+          retention-days: 5
+          compression-level: 9  # Maximum compression for logs

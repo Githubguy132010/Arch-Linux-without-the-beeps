@@ -1,0 +1,39 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Download ISO
+        uses: actions/download-artifact@v3
+        with:
+          name: arch-linux-iso
+          path: dist
+
+      - name: Generate release notes
+        id: changelog
+        run: |
+          echo "## " > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          git log --pretty=format:"* %s (%h) - %ad" --date=short --since="5 days ago" >> CHANGELOG.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: dist/*.iso
+          body_path: CHANGELOG.md
+          tag_name: Pre-release ${{ github.run_number }}
+          name: Pre-release ${{ github.run_number }}
+          draft: false
+          prerelease: true
