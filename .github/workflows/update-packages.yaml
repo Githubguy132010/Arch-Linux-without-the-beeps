@@ -5,6 +5,10 @@ on:
     - cron: '0 2 * * *'  # Run at 2 AM UTC daily
   workflow_dispatch:  # Allow manual trigger
 
+env:
+  MAX_RETRIES: 3
+  RETRY_DELAY: 30
+
 jobs:
   update-packages:
     runs-on: ubuntu-latest
@@ -18,16 +22,28 @@ jobs:
         with:
           ref: dev
 
+      - name: Install GitHub CLI
+        run: |
+          type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+          && sudo apt update \
+          && sudo apt install gh -y
+
       - name: Set up environment variables
         id: env
         run: |
           echo "WORKSPACE=${GITHUB_WORKSPACE}" >> $GITHUB_ENV
           echo "CACHE_KEY=$(date +'%Y-%m')" >> $GITHUB_ENV
+          echo "BUILD_ID=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_ENV
 
       - name: Create Cache Directory
         run: |
           sudo mkdir -p /tmp/pacman-cache
           sudo chmod 777 /tmp/pacman-cache
+          sudo mkdir -p /tmp/build-logs
+          sudo chmod 777 /tmp/build-logs
 
       - name: Cache Pacman packages
         uses: actions/cache@v3
@@ -38,11 +54,22 @@ jobs:
             pacman-
 
       - name: Set up Docker
+        id: docker-setup
         run: |
-          docker run --privileged --name arch-container -d \
-            -v ${{ env.WORKSPACE }}:/workdir \
-            -v /tmp/pacman-cache:/var/cache/pacman/pkg \
-            archlinux:latest sleep infinity
+          for i in $(seq 1 ${{ env.MAX_RETRIES }}); do
+            if docker run --privileged --name arch-container -d \
+              -v ${{ env.WORKSPACE }}:/workdir \
+              -v /tmp/pacman-cache:/var/cache/pacman/pkg \
+              -v /tmp/build-logs:/var/log/build \
+              archlinux:latest sleep infinity; then
+              echo "Docker container started successfully"
+              exit 0
+            fi
+            echo "Attempt $i failed. Retrying in ${{ env.RETRY_DELAY }} seconds..."
+            sleep ${{ env.RETRY_DELAY }}
+          done
+          echo "Failed to start Docker container after ${{ env.MAX_RETRIES }} attempts"
+          exit 1
 
       - name: Initialize Container
         run: |
@@ -50,11 +77,23 @@ jobs:
             set -euo pipefail
             cd /workdir
             
-            # Update package database
-            pacman -Sy --noconfirm
+            # Update package database with retry logic
+            for i in \$(seq 1 ${{ env.MAX_RETRIES }}); do
+              if pacman -Sy --noconfirm; then
+                break
+              fi
+              echo \"Attempt \$i failed. Retrying in ${{ env.RETRY_DELAY }} seconds...\"
+              sleep ${{ env.RETRY_DELAY }}
+            done
             
-            # Install required packages
-            pacman -S --noconfirm --needed curl jq
+            # Install required packages with retry logic
+            for i in \$(seq 1 ${{ env.MAX_RETRIES }}); do
+              if pacman -S --noconfirm --needed curl jq checksum; then
+                break
+              fi
+              echo \"Attempt \$i failed. Retrying in ${{ env.RETRY_DELAY }} seconds...\"
+              sleep ${{ env.RETRY_DELAY }}
+            done
           "
 
       - name: Check for Package Updates
@@ -64,8 +103,11 @@ jobs:
             set -euo pipefail
             cd /workdir
             
-            # Create temporary files in workspace
-            touch current-packages.txt updates.txt
+            # Create log directory
+            mkdir -p /var/log/build
+            
+            # Create temporary files
+            touch current-packages.txt updates.txt changelog.txt
             
             # Get current packages
             grep -v '^#' packages.x86_64 | grep -v '^$' > current-packages.txt
@@ -73,15 +115,27 @@ jobs:
             # Initialize pacman
             pacman -Sy
             
-            # Process each package
+            # Process each package with validation
             while read -r pkg; do
               if pacman -Si \"\$pkg\" >/dev/null 2>&1; then
                 current_ver=\$(pacman -Si \"\$pkg\" | grep Version | head -n1 | awk '{print \$3}')
-                echo \"\$pkg \$current_ver\" >> updates.txt
+                
+                # Verify package integrity
+                if pacman -Sw --noconfirm \"\$pkg\" && pacman -Qk \"\$pkg\" >/dev/null 2>&1; then
+                  echo \"\$pkg \$current_ver\" >> updates.txt
+                  
+                  # Get changelog if available
+                  if pacman -Qi \"\$pkg\" | grep -q 'Changelog'; then
+                    echo \"### \$pkg \$current_ver\" >> changelog.txt
+                    pacman -Qi \"\$pkg\" | grep -A 5 'Changelog' >> changelog.txt
+                  fi
+                else
+                  echo \"Warning: Package \$pkg integrity check failed\" >&2
+                fi
               else
-                echo \"Warning: Package \$pkg not found in repositories\"
+                echo \"Warning: Package \$pkg not found in repositories\" >&2
               fi
-            done < current-packages.txt
+            done < current-packages.txt 2>> /var/log/build/package_errors.log
             
             # Check if we have updates
             if [ -s updates.txt ]; then
@@ -94,14 +148,14 @@ jobs:
             fi
           "
 
-      - name: Create Pull Request
-        if: steps.check-updates.outputs.updates_available == 'true'
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update package versions"
-          title: "📦 Automatic Package Updates"
-          body: |
+          - name: Create Pull Request
+          if: steps.check-updates.outputs.updates_available == 'true'
+          uses: peter-evans/create-pull-request@v5
+          with:
+            token: ${{ secrets.GITHUB_TOKEN }}
+            commit-message: "chore: update package versions"
+            title: "📦 Automatic Package Updates"
+            body: |
             🔄 Automatic package update
             
             The following packages have been updated to their latest version:
@@ -109,17 +163,72 @@ jobs:
             $(cat updates.txt)
             ```
             
+            ## Changelog
+            $(cat changelog.txt)
+            
             This PR was automatically generated by the update-packages workflow.
-          branch: package-updates
-          base: dev
-          labels: |
+            Build ID: ${{ env.BUILD_ID }}
+            branch: package-updates
+            base: dev
+            labels: |
             automated
             dependencies
-          draft: false
+            draft: false
 
-      - name: Clean Up
-        if: always()
-        run: |
-          docker stop arch-container || true
-          docker rm arch-container || true
-          sudo rm -rf /tmp/pacman-cache/*
+          - name: Update Release
+          if: steps.check-updates.outputs.updates_available == 'true'
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          run: |
+          # Get current date for versioning
+          VERSION=$(date +'%Y.%m.%d')
+          
+          # Create release notes
+          echo "# 📦 Package Updates ($VERSION)" > release_notes.md
+          echo "" >> release_notes.md
+          echo "## Updated Packages" >> release_notes.md
+          echo '```' >> release_notes.md
+          cat updates.txt >> release_notes.md
+          echo '```' >> release_notes.md
+          echo "" >> release_notes.md
+          echo "## Changelog" >> release_notes.md
+          cat changelog.txt >> release_notes.md
+          
+          # Check if release exists
+          if gh release view "$VERSION" &>/dev/null; then
+          # Update existing release
+          gh release edit "$VERSION" --notes-file release_notes.md
+          else
+          # Create new release
+          gh release create "$VERSION" \
+            --title "Package Updates $VERSION" \
+            --notes-file release_notes.md \
+            --target dev
+          fi
+
+          - name: Upload Build Logs
+          if: always()
+          uses: actions/upload-artifact@v3
+          with:
+            name: build-logs-${{ env.BUILD_ID }}
+            path: /tmp/build-logs/
+            retention-days: 7
+
+          - name: Clean Up
+          if: always()
+          run: |
+            docker stop arch-container || true
+            docker rm arch-container || true
+            sudo rm -rf /tmp/pacman-cache/*
+
+          - name: Notify on Failure
+          if: failure()
+          uses: actions/github-script@v6
+          with:
+            script: |
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '❌ Package Update Workflow Failed',
+              body: `The package update workflow failed on ${new Date().toISOString()}\n\nBuild ID: ${process.env.BUILD_ID}\n\nPlease check the workflow logs for details.`
+            });

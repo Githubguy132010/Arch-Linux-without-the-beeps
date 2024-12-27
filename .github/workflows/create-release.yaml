@@ -1,39 +1,104 @@
-name: Create Release
+name: Create/Update Release
 
 on:
+  push:
+    branches:
+      - main
+      - dev
   workflow_dispatch:
 
+env:
+  MAX_RETRIES: 3
+  RETRY_DELAY: 30
+
 jobs:
-  release:
+  update-release:
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: write
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout Repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Download ISO
-        uses: actions/download-artifact@v3
-        with:
-          name: arch-linux-iso
-          path: dist
-
-      - name: Generate release notes
-        id: changelog
+      - name: Set up environment variables
+        id: env
         run: |
-          echo "## " > CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          git log --pretty=format:"* %s (%h) - %ad" --date=short --since="5 days ago" >> CHANGELOG.md
+          echo "VERSION=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
+          echo "BUILD_ID=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_ENV
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+      - name: Generate Release Notes
+        run: |
+          # Create release notes header
+          echo "# 🚀 Release ${{ env.VERSION }}" > release_notes.md
+          echo "" >> release_notes.md
+          
+          # Add recent changes
+          echo "## 📝 Recent Changes" >> release_notes.md
+          echo "" >> release_notes.md
+          git log --pretty=format:"- %s" -n 10 >> release_notes.md
+          echo "" >> release_notes.md
+          echo "" >> release_notes.md
+          
+          # Add package information if available
+          if [ -f "updates.txt" ]; then
+            echo "## 📦 Updated Packages" >> release_notes.md
+            echo "\`\`\`" >> release_notes.md
+            cat updates.txt >> release_notes.md
+            echo "\`\`\`" >> release_notes.md
+            echo "" >> release_notes.md
+          fi
+          
+          # Add changelog if available
+          if [ -f "changelog.txt" ]; then
+            echo "## 📋 Package Changelog" >> release_notes.md
+            cat changelog.txt >> release_notes.md
+          fi
+          
+          # Add build information
+          echo "" >> release_notes.md
+          echo "## 🔧 Build Information" >> release_notes.md
+          echo "- Build ID: \`${{ env.BUILD_ID }}\`" >> release_notes.md
+          echo "- Commit: \`$(git rev-parse HEAD)\`" >> release_notes.md
+          echo "- Branch: \`${GITHUB_REF#refs/heads/}\`" >> release_notes.md
+          echo "- Build Date: \`$(date -u '+%Y-%m-%d %H:%M:%S UTC')\`" >> release_notes.md
+
+      - name: Update Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if release exists
+          if gh release view "${{ env.VERSION }}" &>/dev/null; then
+            # Update existing release
+            gh release edit "${{ env.VERSION }}" \
+              --title "Release ${{ env.VERSION }}" \
+              --notes-file release_notes.md
+          else
+            # Create new release
+            gh release create "${{ env.VERSION }}" \
+              --title "Release ${{ env.VERSION }}" \
+              --notes-file release_notes.md \
+              --target ${GITHUB_REF#refs/heads/}
+          fi
+
+      - name: Upload Build Logs
+        if: always()
+        uses: actions/upload-artifact@v3
         with:
-          files: dist/*.iso
-          body_path: CHANGELOG.md
-          tag_name: Pre-release ${{ github.run_number }}
-          name: Pre-release ${{ github.run_number }}
-          draft: false
-          prerelease: true
+          name: release-logs-${{ env.BUILD_ID }}
+          path: release_notes.md
+          retention-days: 7
+
+      - name: Notify on Failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '❌ Release Update Failed',
+              body: `The release update workflow failed on ${new Date().toISOString()}\n\nBuild ID: ${process.env.BUILD_ID}\n\nPlease check the workflow logs for details.`
+            });

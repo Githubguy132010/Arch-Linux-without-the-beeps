@@ -1,64 +1,91 @@
-## 🔄 Automated Workflows
+# Workflow Documentation
 
-This project uses the following GitHub Actions workflows:
+## Overview
+This document details the automated workflows used in the Arch Linux Without the Beeps project.
 
-### Build ISO
+## Package Update Workflow
 
-File: `build-and-release.yaml`
+### Purpose
+The package update workflow (`update-packages.yaml`) automatically checks for package updates and creates pull requests when updates are available.
 
-Triggered by:
-- 🔘 Manual trigger
-- ⏰ Scheduled: `0 0 * * *`
-- 📤 Push to repository
+### Workflow Triggers
+- Scheduled: Runs daily at 2 AM UTC
+- Manual: Can be triggered via GitHub Actions interface
 
-### Build Arch Linux ISO
+### Process Steps
+1. **Environment Setup**
+   - Checks out repository
+   - Sets up Docker container
+   - Initializes package cache
 
-File: `build-and-save.yaml`
+2. **Package Verification**
+   - Validates current package list
+   - Checks for available updates
+   - Verifies package integrity
 
-Triggered by:
-- 🔘 Manual trigger
-- ⏰ Scheduled: `0 0 * * *`
+3. **Update Process**
+   - Creates update manifest
+   - Generates package changelog
+   - Creates pull request with updates
 
-### Validate and Test Build
+### Error Handling
+- Implements retry logic for failed downloads
+- Validates package checksums
+- Maintains build logs
+- Cleans up temporary files
 
-File: `build-check.yaml`
+## Build Process
 
-Triggered by:
-- 🔘 Manual trigger
-- ⏰ Scheduled: `0 0 * * *`
-- 🔄 Pull request
+### ISO Build Steps
+1. **Preparation**
+   - Validate configurations
+   - Check system requirements
+   - Prepare build environment
 
-### Create Release
+2. **Build Process**
+   - Generate ISO
+   - Verify system configurations
+   - Perform integrity checks
 
-File: `create-release.yaml`
+3. **Validation**
+   - Check ISO checksums
+   - Verify beep configurations
+   - Test critical components
 
-Triggered by:
-- 🔘 Manual trigger
+### Safety Measures
+- Automated testing procedures
+- Rollback capabilities
+- Configuration backups
+- Build artifact validation
 
-### Check to make sure Dockerfile works
+## Maintenance
 
-File: `dockerfile-check.yaml`
+### Cache Management
+- Monthly cache rotation
+- Automated cleanup procedures
+- Storage optimization
 
-Triggered by:
-- 🔘 Manual trigger
-- ⏰ Scheduled: ``
-- 🔄 Pull request
+### Monitoring
+- Build status tracking
+- Error reporting
+- Performance metrics
 
-### Update Documentation
+## Troubleshooting
 
-File: `update-docs.yaml`
+### Common Issues
+1. **Build Failures**
+   - Check system resources
+   - Verify package availability
+   - Review error logs
 
-Triggered by:
-- 🔘 Manual trigger
-- ⏰ Scheduled: `" -f2)`
-- 📤 Push to repository
-- 🔄 Pull request
+2. **Package Conflicts**
+   - Check dependency tree
+   - Verify package versions
+   - Review conflict reports
 
-### Update Packages
-
-File: `update-packages.yaml`
-
-Triggered by:
-- 🔘 Manual trigger
-- ⏰ Scheduled: `0 2 * * *`
+### Recovery Procedures
+1. Clear build cache
+2. Reset Docker environment
+3. Verify package integrity
+4. Check system configurations
 

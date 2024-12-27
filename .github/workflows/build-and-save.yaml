@@ -1,35 +1,128 @@
-name: Build Arch Linux ISO
+name: Build and Save ISO
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Run the workflow every day at midnight
-  workflow_dispatch:      # Manual trigger option
+    - cron: '0 0 * * *'  # Run daily at midnight UTC
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Create/Update Release", "Update Packages"]
+    types:
+      - completed
+
+env:
+  ISO_FILENAME: archlinux-custom.iso
+  MAX_RETRIES: 3
+  RETRY_DELAY: 30
 
 jobs:
-  build:
+  build-iso:
     runs-on: ubuntu-latest
-    container:
-      image: archlinux:latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    permissions:
+      contents: write
 
-      - name: Install dependencies
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up environment variables
+        id: env
         run: |
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm archiso git
-          
+          echo "VERSION=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
+          echo "BUILD_ID=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_ENV
+          echo "WORKSPACE=${GITHUB_WORKSPACE}" >> $GITHUB_ENV
+
+      - name: Set up Docker
+        run: |
+          docker build -t arch-iso-builder .
+
       - name: Build ISO
         run: |
-          mkdir -p work out
-          cp -r /usr/share/archiso/configs/releng/* work/
-          cp -r * work/airootfs/ || true
-          mkarchiso -v -w work/ -o out/ work/
+          mkdir -p workdir out
+          
+          # Build ISO with retry logic
+          for i in $(seq 1 ${{ env.MAX_RETRIES }}); do
+            if docker run --rm --privileged \
+              -v ${{ env.WORKSPACE }}:/workdir \
+              arch-iso-builder \
+              bash -c "mkarchiso -v -w /workdir/work/ -o /workdir/out/ /workdir/"; then
+              echo "ISO build successful"
+              break
+            fi
+            
+            if [ $i -eq ${{ env.MAX_RETRIES }} ]; then
+              echo "Failed to build ISO after ${{ env.MAX_RETRIES }} attempts"
+              exit 1
+            fi
+            
+            echo "Attempt $i failed. Retrying in ${{ env.RETRY_DELAY }} seconds..."
+            sleep ${{ env.RETRY_DELAY }}
+          done
 
-      - name: Upload ISO
+      - name: Generate ISO Checksum
+        run: |
+          cd out
+          sha256sum ${{ env.ISO_FILENAME }} > ${{ env.ISO_FILENAME }}.sha256
+          cat ${{ env.ISO_FILENAME }}.sha256
+
+      - name: Update Release with ISO
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if release exists
+          if ! gh release view "${{ env.VERSION }}" &>/dev/null; then
+            # Create release if it doesn't exist
+            gh release create "${{ env.VERSION }}" \
+              --title "Release ${{ env.VERSION }}" \
+              --notes "Arch Linux Custom ISO Build ${{ env.VERSION }}"
+          fi
+          
+          # Upload ISO and checksum to the release
+          gh release upload "${{ env.VERSION }}" \
+            "out/${{ env.ISO_FILENAME }}" \
+            "out/${{ env.ISO_FILENAME }}.sha256" \
+            --clobber
+
+      - name: Update Release Notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Generate ISO information
+          {
+            echo "## 💿 ISO Information"
+            echo "- Filename: \`${{ env.ISO_FILENAME }}\`"
+            echo "- Size: \`$(ls -lh out/${{ env.ISO_FILENAME }} | awk '{print $5}')\`"
+            echo "- SHA256: \`$(cat out/${{ env.ISO_FILENAME }}.sha256 | awk '{print $1}')\`"
+            echo "- Build ID: \`${{ env.BUILD_ID }}\`"
+            echo "- Build Date: \`$(date -u '+%Y-%m-%d %H:%M:%S UTC')\`"
+          } > iso_info.md
+          
+          # Append ISO information to existing release notes
+          gh release edit "${{ env.VERSION }}" \
+            --notes-file <(cat <(gh release view "${{ env.VERSION }}" --json body --jq .body) iso_info.md)
+
+      - name: Upload Build Artifacts
+        if: always()
         uses: actions/upload-artifact@v3
         with:
-          name: arch-linux-iso
-          path: out/*.iso
-          retention-days: 5
+          name: iso-build-${{ env.BUILD_ID }}
+          path: |
+            out/${{ env.ISO_FILENAME }}
+            out/${{ env.ISO_FILENAME }}.sha256
+          retention-days: 7
+
+      - name: Clean Up
+        if: always()
+        run: |
+          rm -rf workdir out
+
+      - name: Notify on Failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '❌ ISO Build Failed',
+              body: `The ISO build workflow failed on ${new Date().toISOString()}\n\nBuild ID: ${process.env.BUILD_ID}\n\nPlease check the workflow logs for details.`
+            });
