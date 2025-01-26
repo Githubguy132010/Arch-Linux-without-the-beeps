@@ -23,6 +23,36 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Validate package list
+        run: |
+          # Check if package list exists
+          if [ ! -f packages.x86_64 ]; then
+            echo "::error::packages.x86_64 file not found"
+            exit 1
+          fi
+
+          # Check for duplicate packages
+          sort packages.x86_64 | uniq -d > duplicates.txt
+          if [ -s duplicates.txt ]; then
+            echo "::error::Duplicate packages found:"
+            cat duplicates.txt
+            exit 1
+          fi
+          
+          # Validate package names exist in Arch repos
+          docker run --rm -v "${{ github.workspace }}/packages.x86_64:/packages.x86_64:ro" archlinux:latest bash -c "
+            set -euo pipefail
+            pacman -Syu --noconfirm
+            while read -r pkg; do
+              [[ \$pkg =~ ^# ]] && continue
+              [[ -z \$pkg ]] && continue
+              if ! pacman -Si \$pkg >/dev/null 2>&1; then
+                echo \"::error::Package not found: \$pkg\"
+                exit 1
+              fi
+            done < /packages.x86_64
+          "
+
   security-scan:
     runs-on: ubuntu-latest
     steps:
@@ -52,6 +82,14 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Cache Pacman packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PACMAN_CACHE }}
+          key: pacman-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            pacman-${{ runner.os }}-
 
       - name: Set up Arch Linux Container
         run: |
