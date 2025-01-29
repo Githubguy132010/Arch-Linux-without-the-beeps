@@ -14,7 +14,7 @@ This project provides ISO builds of Arch Linux. We maintain and provide security
 We take the security of this project seriously. If you believe you have found a security vulnerability, please follow these steps:
 
 1. **Do Not** open a public issue on GitHub
-2. Send a description of the vulnerability to [project maintainer's email]
+2. Send a description of the vulnerability to thomas.brugman.teb3@gmail.com
 3. Include the following information:
    - Type of issue
    - Full paths of source file(s) related to the issue
