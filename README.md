@@ -1,4 +1,3 @@
-
 ---
 
 # Arch Linux Without the Beeps
@@ -80,6 +79,129 @@ The GitHub Actions workflow automatically builds and releases the ISO. Here’s 
 1. **Run the workflow**:
    You can run the workflow by going to **Actions > Build ISO** and clicking on **Run Workflow**. 
 
+### Detailed Explanations of Each Workflow
+
+#### Validate and Test Build
+
+- **File**: `build-check.yaml`
+- **Purpose**: Validates the package list, runs a security scan, and tests the build process.
+- **Steps**:
+  1. **Checkout Repository**: Pulls the latest files from the repository.
+  2. **Validate Package List**: Checks for duplicate packages and validates package names.
+  3. **Run Security Scan**: Uses Trivy to scan for vulnerabilities.
+  4. **Test Build**: Builds the ISO and verifies its integrity.
+
+#### Build ISO
+
+- **File**: `build.yaml`
+- **Purpose**: Builds the Arch Linux ISO.
+- **Steps**:
+  1. **Checkout Repository**: Pulls the latest files from the repository.
+  2. **Set up Environment Variables**: Initializes necessary environment variables.
+  3. **Cache Pacman Packages**: Caches packages to speed up the build process.
+  4. **Set up Arch Linux Container**: Initializes the build environment.
+  5. **Build ISO**: Builds the ISO using `mkarchiso`.
+  6. **Generate Checksums**: Creates SHA256 and SHA512 checksums for the ISO.
+  7. **Rename and Move ISO**: Renames the ISO file and moves it to the output directory.
+  8. **Generate Release Notes**: Creates release notes for the new ISO.
+  9. **Create Release**: Uploads the ISO and checksums as a new release on GitHub.
+
+#### Check Dockerfile
+
+- **File**: `dockerfile-check.yaml`
+- **Purpose**: Ensures the Dockerfile works correctly.
+- **Steps**:
+  1. **Checkout Repository**: Pulls the latest files from the repository.
+  2. **Build and Run Docker Container**: Builds the Docker image and runs the container to create the ISO.
+
+### Setting Up and Configuring Dependabot
+
+Dependabot can be used to automate dependency updates for GitHub Actions. Here's how to set it up:
+
+1. **Create a `.github/dependabot.yml` file**:
+
+   ```yaml
+   version: 2
+   updates:
+     - package-ecosystem: "github-actions"
+       directory: "/.github/workflows"
+       schedule:
+         interval: "daily"
+       labels:
+         - "github-actions"
+       assignees:
+         - "Githubguy132010"
+   ```
+
+2. **Commit and Push**: Commit the file to your repository and push the changes. Dependabot will now check for updates daily and create pull requests for any updates it finds.
+
+### Monitoring and Troubleshooting GitHub Actions Workflows
+
+1. **Monitor Workflow Runs**: Go to the **Actions** tab in your repository to see the status of workflow runs.
+2. **View Logs**: Click on a workflow run to view detailed logs of each step.
+3. **Troubleshoot Failures**:
+   - **Check Logs**: Look for error messages in the logs to identify the cause of the failure.
+   - **Rerun Jobs**: You can rerun failed jobs by clicking on the **Re-run jobs** button.
+   - **Update Dependencies**: Ensure that all dependencies are up to date.
+
+---
+
+## Troubleshooting Common Issues
+
+### Docker Permission Errors
+
+If you encounter permission errors when running Docker commands, try the following solutions:
+
+1. **Add Your User to the Docker Group**:
+
+   ```bash
+   sudo usermod -aG docker $USER
+   newgrp docker
+   ```
+
+2. **Run Docker Commands with `sudo`**:
+
+   ```bash
+   sudo docker run ...
+   ```
+
+### Network Problems
+
+If you experience network issues during the build process, consider the following tips:
+
+1. **Check Your Internet Connection**: Ensure that your internet connection is stable.
+2. **Use a Different Network**: Try using a different network to see if the issue persists.
+3. **Configure Docker Network Settings**: Adjust Docker's network settings if necessary.
+
+### Common Build Errors
+
+#### Package Not Found
+
+If a package is not found during the build process, ensure that the package name is correct and that it exists in the Arch Linux repositories.
+
+#### Duplicate Packages
+
+If duplicate packages are found in the package list, remove the duplicates to resolve the issue.
+
+---
+
+## FAQ
+
+### What is the purpose of this project?
+
+This project provides a customized Arch Linux ISO with system beeps disabled, ideal for users who prefer a quieter environment.
+
+### How often is the ISO updated?
+
+The ISO is updated daily through an automated GitHub Actions workflow.
+
+### How can I contribute to this project?
+
+You can contribute by reporting issues, suggesting features, or submitting pull requests. Please refer to the [CONTRIBUTING.md](CONTRIBUTING.md) file for more details.
+
+### Where can I download the latest ISO?
+
+You can download the latest ISO from the [releases page](https://github.com/Githubguy132010/Arch-Linux-without-the-beeps/releases).
 
 ---
 
