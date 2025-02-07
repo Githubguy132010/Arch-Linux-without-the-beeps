@@ -15,6 +15,7 @@ on:
 env:
   DOCKER_BUILDKIT: 1
   ISO_FILENAME: Arch.iso
+  WORKSPACE: ${{ github.workspace }}
 
 jobs:
   build:
@@ -36,7 +37,7 @@ jobs:
       - name: Set up Arch Linux Container
         run: |
           docker run --privileged --name arch-container -d \
-            -v ${{ env.WORKSPACE }}:/workdir \
+            -v ${WORKSPACE}:/workdir \
             -v /tmp/pacman-cache:/var/cache/pacman/pkg \
             archlinux:latest sleep infinity
 
