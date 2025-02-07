@@ -30,23 +30,8 @@ jobs:
         run: |
           echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           echo "VERSION=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
-          echo "CACHE_KEY=$(date +'%Y-%m')" >> $GITHUB_ENV
-          echo "WORKSPACE=${GITHUB_WORKSPACE}" >> $GITHUB_ENV
 
-      - name: Create Cache Directories
-        run: |
-          sudo mkdir -p /tmp/pacman-cache
-          sudo chmod 777 /tmp/pacman-cache
-          # Ensure the directory is empty to prevent tar errors
-          sudo rm -rf /tmp/pacman-cache/*
 
-      - name: Cache Pacman packages
-        uses: actions/cache@v4
-        with:
-          path: /tmp/pacman-cache
-          key: pacman-${{ runner.os }}-${{ env.CACHE_KEY }}
-          restore-keys: |
-            pacman-${{ runner.os }}-
 
       - name: Set up Arch Linux Container
         run: |
@@ -139,47 +124,34 @@ jobs:
           # Create a temporary file for release notes
           TEMP_RELEASE_NOTES=$(mktemp)
           
-          docker exec arch-container bash -c "
-            set -euo pipefail
-            cd /workdir
-            
-            # Initialize release notes
-            {
-              echo '🚀 Arch Linux ISO without system beeps (build ${{ env.DATE }})'
-              echo ''
-              echo '### Changes'
-              
-              # Get changes since last release
-              if git tag | grep -q .; then
-                LAST_TAG=\$(git describe --tags --abbrev=0 2>/dev/null || echo '')
-                if [ ! -z \"\$LAST_TAG\" ]; then
-                  echo '#### Commits since last release:'
-                  git log \"\$LAST_TAG\"..HEAD --pretty=format:'- %s' | grep -v 'Merge'
-                  echo ''
-                fi
-              fi
-              
-              # Add standard information
-              echo '### Features'
-              echo '- Automatic daily build'
-              echo '- System beeps disabled'
-              echo '- ISO SHA256 and SHA512 checksums included'
-              echo ''
-              echo '### Download'
-              echo '- Download the ISO and verify checksums before use'
-              echo ''
-              echo '### Checksums'
-              echo 'SHA256 and SHA512 checksums are available in the uploaded files.'
-            } > /tmp/release_notes
-          "
+          # Generate header for release notes
+          echo "🚀 Arch Linux ISO without system beeps (build ${{ env.DATE }})" > $TEMP_RELEASE_NOTES
+          echo "" >> $TEMP_RELEASE_NOTES
           
-          # Copy release notes from container to host
-          docker cp arch-container:/tmp/release_notes $TEMP_RELEASE_NOTES
+          # Get release notes from GitHub action
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/${GITHUB_REPOSITORY}/releases/generate-notes \
+            -F tag_name="v${{ env.VERSION }}" \
+            -F target_commitish="${GITHUB_SHA}" \
+            -F previous_tag_name="$(git describe --tags --abbrev=0 2>/dev/null || echo '')" \
+            | jq -r '.body' >> $TEMP_RELEASE_NOTES
+          
+          # Add standard information
+          {
+            echo ""
+            echo "### Download"
+            echo "- Download the ISO and verify checksums before use"
+            echo ""
+            echo "### Checksums"
+            echo "SHA256 and SHA512 checksums are available in the uploaded files."
+          } >> $TEMP_RELEASE_NOTES
           
           # Set the release notes in GITHUB_ENV
-          echo 'RELEASE_NOTES<<EOF' >> $GITHUB_ENV
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
           cat $TEMP_RELEASE_NOTES >> $GITHUB_ENV
-          echo 'EOF' >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
           
           # Cleanup
           rm -f $TEMP_RELEASE_NOTES
@@ -205,14 +177,4 @@ jobs:
             docker stop arch-container || true
             docker rm -f arch-container || true
           fi
-          sudo rm -rf workdir/ out/ /tmp/pacman-cache/*
-
-      - name: Upload Build Logs on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4  # Upgrade to v4
-        with:
-          name: build-logs
-          path: |
-            ${{ env.WORKSPACE }}/build.log
-          retention-days: 5
-          compression-level: 9  # Maximum compression for logs
+          sudo rm -rf workdir/ out/*.iso out/*.sha*sum
