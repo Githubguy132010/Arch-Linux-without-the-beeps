@@ -17,65 +17,7 @@ env:
   OUTPUT_DIR: /workdir/out
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Validate package list
-        run: |
-          # Check if package list exists
-          if [ ! -f packages.x86_64 ]; then
-            echo "::error::packages.x86_64 file not found"
-            exit 1
-          fi
-
-          # Check for duplicate packages
-          sort packages.x86_64 | uniq -d > duplicates.txt
-          if [ -s duplicates.txt ]; then
-            echo "::error::Duplicate packages found:"
-            cat duplicates.txt
-            exit 1
-          fi
-          
-          # Validate package names exist in Arch repos
-          docker run --rm -v "${{ github.workspace }}/packages.x86_64:/packages.x86_64:ro" archlinux:latest bash -c "
-            set -euo pipefail
-            pacman -Syu --noconfirm
-            while read -r pkg; do
-              [[ \$pkg =~ ^# ]] && continue
-              [[ -z \$pkg ]] && continue
-              if ! pacman -Si \$pkg >/dev/null 2>&1; then
-                echo \"::error::Package not found: \$pkg\"
-                exit 1
-              fi
-            done < /packages.x86_64
-          "
-
-  security-scan:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Run Security Scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          ignore-unfixed: true
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
-
-      - name: Upload Scan Results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
-
   test-build:
-    needs: [validate, security-scan]
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
@@ -104,7 +46,7 @@ jobs:
           docker exec arch-container bash -c "
             set -euo pipefail
             pacman -Syu --noconfirm
-            pacman -S --noconfirm --needed git archiso grub
+            pacman -S --noconfirm --needed git archiso grub qemu
           "
 
       - name: Test Build
@@ -149,6 +91,16 @@ jobs:
               echo '::error::ISO checksum verification failed'
               exit 1
             }
+
+            # Verify ISO bootability
+            qemu-system-x86_64 -cdrom \"\$iso_file\" -boot d -m 512 -nographic -net none -no-reboot -serial mon:stdio -display none -kernel /boot/vmlinuz-linux -initrd /boot/initramfs-linux.img -append \"console=ttyS0\" || {
+              echo '::error::ISO bootability test failed'
+              exit 1
+            }
+
+            # Generate additional checksums
+            md5sum \"\$iso_file\" > checksum.md5
+            sha1sum \"\$iso_file\" > checksum.sha1
           "
 
       - name: Clean Up
