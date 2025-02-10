@@ -175,8 +175,7 @@ If duplicate packages are found in the package list, remove the duplicates to re
 
 ## Setting Up the Development Environment
 
-To set up the development environment for new contributors, follow these steps:
-
+To set up the development environment, follow these steps:
 1. **Clone the repository**: Start by cloning the repository to your local machine.
 
    ```bash
