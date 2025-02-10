@@ -1,5 +1,4 @@
 ---
-
 # Arch Linux Without the Beeps
 
 This repository provides a customized Arch Linux ISO with the system beeps disabled, ideal for users who prefer a quieter environment.
@@ -50,7 +49,6 @@ Make sure you have Docker installed on your system.
 
    Once the process completes, the ISO will be available in the `out/` directory within your local folder as `Arch.iso`.
 
-
 ## How to Use GitHub Actions (Automated Workflow)
 
 This repository also includes a GitHub Actions workflow for building and releasing the ISO automatically on GitHub. 
@@ -80,16 +78,6 @@ The GitHub Actions workflow automatically builds and releases the ISO. Here’s 
    You can run the workflow by going to **Actions > Build ISO** and clicking on **Run Workflow**. 
 
 ### Detailed Explanations of Each Workflow
-
-#### Validate and Test Build
-
-- **File**: `build-check.yaml`
-- **Purpose**: Validates the package list, runs a security scan, and tests the build process.
-- **Steps**:
-  1. **Checkout Repository**: Pulls the latest files from the repository.
-  2. **Validate Package List**: Checks for duplicate packages and validates package names.
-  3. **Run Security Scan**: Uses Trivy to scan for vulnerabilities.
-  4. **Test Build**: Builds the ISO and verifies its integrity.
 
 #### Build ISO
 
