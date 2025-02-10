@@ -173,6 +173,53 @@ If duplicate packages are found in the package list, remove the duplicates to re
 
 ---
 
+## Setting Up the Development Environment
+
+To set up the development environment for new contributors, follow these steps:
+
+1. **Clone the repository**: Start by cloning the repository to your local machine.
+
+   ```bash
+   git clone https://github.com/Githubguy132010/Arch-Linux-without-the-beeps.git
+   cd Arch-Linux-without-the-beeps
+   ```
+
+2. **Install Docker**: Ensure Docker is installed on your system. Docker is used to create a containerized environment for building the ISO.
+
+3. **Build the Docker image**: Build the Docker image that will be used to build the ISO.
+
+   ```bash
+   docker build -t arch-iso-builder .
+   ```
+
+4. **Run the Docker container**: Use the Docker image to run a container and build the ISO.
+
+   ```bash
+   docker run --rm --privileged -v $(pwd):/workdir arch-iso-builder bash -c "mkarchiso -v -w workdir/ -o out/ ."
+   ```
+
+5. **Retrieve the ISO**: After the build process completes, the ISO will be available in the `out/` directory within your local folder as `Arch.iso`.
+
+6. **Set up GitHub Actions**: If you want to use GitHub Actions for automated builds, ensure the workflows in `.github/workflows/` are correctly configured. The `.github/workflows/build.yaml` and `.github/workflows/build-check.yaml` files provide the necessary steps for building and verifying the ISO.
+
+7. **Follow contribution guidelines**: Refer to the `CONTRIBUTING.md` file for detailed instructions on how to contribute to the project, including reporting bugs, submitting fixes, and proposing new features.
+
+8. **Refer to the README**: The `README.md` file provides detailed steps for building the ISO locally and using GitHub Actions. It also includes troubleshooting information for common issues.
+
+---
+
+## Additional Resources for New Contributors
+
+Here are some additional resources and links that can help new contributors get started:
+
+- [Arch Linux Wiki](https://wiki.archlinux.org/): Comprehensive documentation and guides for Arch Linux.
+- [Docker Documentation](https://docs.docker.com/): Official Docker documentation and tutorials.
+- [GitHub Actions Documentation](https://docs.github.com/en/actions): Official GitHub Actions documentation and guides.
+- [Arch Linux Forums](https://bbs.archlinux.org/): Community forums for Arch Linux users and developers.
+- [GitHub Guides](https://guides.github.com/): Guides and tutorials for using GitHub effectively.
+
+---
+
 ## FAQ
 
 ### What is the purpose of this project?
