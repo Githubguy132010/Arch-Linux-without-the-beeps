@@ -20,6 +20,40 @@ If you prefer to build the Arch Linux ISO locally, you can use Docker to set up 
 
 Make sure you have Docker installed on your system.
 
+#### Docker Installation
+
+To install Docker, follow the instructions for your operating system:
+
+- **Windows**:
+  1. Download and install Docker Desktop from [Docker's official website](https://www.docker.com/products/docker-desktop).
+  2. Follow the installation instructions and start Docker Desktop.
+
+- **macOS**:
+  1. Download and install Docker Desktop from [Docker's official website](https://www.docker.com/products/docker-desktop).
+  2. Follow the installation instructions and start Docker Desktop.
+
+- **Linux**:
+  1. Follow the official Docker installation guide for your distribution:
+     - [Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
+     - [Debian](https://docs.docker.com/engine/install/debian/)
+     - [Fedora](https://docs.docker.com/engine/install/fedora/)
+     - [CentOS](https://docs.docker.com/engine/install/centos/)
+  2. Start the Docker service:
+     ```bash
+     sudo systemctl start docker
+     sudo systemctl enable docker
+     ```
+
+#### Common Troubleshooting Tips
+
+- **Permission Errors**: If you encounter permission errors, try adding your user to the Docker group:
+  ```bash
+  sudo usermod -aG docker $USER
+  newgrp docker
+  ```
+
+- **Network Issues**: Ensure your internet connection is stable. If problems persist, try using a different network or adjusting Docker's network settings.
+
 ### Steps to Build Locally
 
 1. **Clone the repository**:
