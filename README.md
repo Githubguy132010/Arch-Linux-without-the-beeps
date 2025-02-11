@@ -120,13 +120,12 @@ The GitHub Actions workflow automatically builds and releases the ISO. Here’s 
 - **Steps**:
   1. **Checkout Repository**: Pulls the latest files from the repository.
   2. **Set up Environment Variables**: Initializes necessary environment variables.
-  3. **Cache Pacman Packages**: Caches packages to speed up the build process.
-  4. **Set up Arch Linux Container**: Initializes the build environment.
-  5. **Build ISO**: Builds the ISO using `mkarchiso`.
-  6. **Generate Checksums**: Creates SHA256 and SHA512 checksums for the ISO.
-  7. **Rename and Move ISO**: Renames the ISO file and moves it to the output directory.
-  8. **Generate Release Notes**: Creates release notes for the new ISO.
-  9. **Create Release**: Uploads the ISO and checksums as a new release on GitHub.
+  3. **Set up Arch Linux Container**: Initializes the build environment.
+  4. **Build ISO**: Builds the ISO using `mkarchiso`.
+  5. **Generate Checksums**: Creates SHA256 and SHA512 checksums for the ISO.
+  6. **Rename and Move ISO**: Renames the ISO file and moves it to the output directory.
+  7. **Generate Release Notes**: Creates release notes for the new ISO.
+  8. **Create Release**: Uploads the ISO and checksums as a new release on GitHub.
 
 #### Check Dockerfile
 
