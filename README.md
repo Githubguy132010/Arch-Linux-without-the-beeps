@@ -196,3 +196,42 @@ You can download the latest ISO from the [releases page](https://github.com/Gith
 ## License
 
 This project is licensed under my custom license - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## Contributing
+
+We welcome contributions! Please see the [CONTRIBUTING.md](CONTRIBUTING.md) file for guidelines on how to get involved.
+
+---
+
+## Resources
+
+Here are some additional resources for new contributors:
+
+- [Arch Linux Wiki](https://wiki.archlinux.org/)
+- [Arch Linux Forums](https://bbs.archlinux.org/)
+- [Arch Linux Documentation](https://archlinux.org/documentation/)
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
+- [Docker Documentation](https://docs.docker.com/)
+
+---
+
+## Setting Up GitHub Actions for Automated Builds
+
+To set up GitHub Actions for automated builds, follow these steps:
+
+1. **Create a GitHub Actions Workflow**:
+   - Create a `.github/workflows/build.yaml` file with the necessary configuration to build and release the ISO.
+
+2. **Configure the Workflow**:
+   - Ensure the workflow is set up to trigger on the desired events, such as pushes to the `main` branch or scheduled runs.
+
+3. **Monitor Workflow Runs**:
+   - Go to the **Actions** tab in your repository to see the status of workflow runs and view detailed logs.
+
+4. **Troubleshoot Failures**:
+   - Check the logs for error messages and rerun failed jobs if necessary.
+
+5. **Update Dependencies**:
+   - Use Dependabot to automate dependency updates for GitHub Actions workflows.
