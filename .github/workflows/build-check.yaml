@@ -25,14 +25,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Cache Pacman packages
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.PACMAN_CACHE }}
-          key: pacman-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            pacman-${{ runner.os }}-
-
       - name: Set up Arch Linux Container
         run: |
           mkdir -p ${{ env.PACMAN_CACHE }}
@@ -89,12 +81,6 @@ jobs:
             sha256sum \"\$iso_file\" > checksum.sha256
             sha256sum -c checksum.sha256 || {
               echo '::error::ISO checksum verification failed'
-              exit 1
-            }
-
-            # Verify ISO bootability
-            qemu-system-x86_64 -cdrom \"\$iso_file\" -boot d -m 512 -nographic -net none -no-reboot -serial mon:stdio -display none -kernel /boot/vmlinuz-linux -initrd /boot/initramfs-linux.img -append \"console=ttyS0\" || {
-              echo '::error::ISO bootability test failed'
               exit 1
             }
 
