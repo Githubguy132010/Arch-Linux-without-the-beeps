@@ -169,23 +169,6 @@ Dependabot can be used to automate dependency updates for GitHub Actions. Here's
 
 ## Troubleshooting Common Issues
 
-### Docker Permission Errors
-
-If you encounter permission errors when running Docker commands, try the following solutions:
-
-1. **Add Your User to the Docker Group**:
-
-   ```bash
-   sudo usermod -aG docker $USER
-   newgrp docker
-   ```
-
-2. **Run Docker Commands with `sudo`**:
-
-   ```bash
-   sudo docker run ...
-   ```
-
 ### Network Problems
 
 If you experience network issues during the build process, consider the following tips:
@@ -232,37 +215,3 @@ This project is licensed under my custom license - see the [LICENSE](LICENSE) fi
 
 ---
 
-## Setting Up the Development Environment
-
-To set up the development environment for this project, follow these steps:
-
-1. **Ensure you have Docker installed on your system**. Refer to the instructions in the `README.md` for Docker installation on different operating systems.
-2. **Clone the repository**:
-   ```bash
-   git clone https://github.com/Githubguy132010/Arch-Linux-without-the-beeps.git
-   cd Arch-Linux-without-the-beeps
-   ```
-3. **Build the Docker image**:
-   ```bash
-   docker build -t arch-iso-builder .
-   ```
-4. **Run the Docker container to build the ISO**:
-   ```bash
-   docker run --rm --privileged -v $(pwd):/workdir arch-iso-builder bash -c "mkarchiso -v -w workdir/ -o out/ ."
-   ```
-5. **Retrieve the ISO from the `out/` directory in your local folder**.
-
-For more detailed instructions, refer to the `README.md` file. If you encounter any issues, check the troubleshooting section in the same file.
-
----
-
-## Additional Resources for New Contributors
-
-To help new contributors get started with the project, the following additional resources are available:
-
-- **Detailed setup instructions**: Ensure the `README.md` file includes comprehensive steps for setting up the development environment, including Docker installation and common troubleshooting tips.
-- **Contribution guidelines**: Expand the `CONTRIBUTING.md` file to include more specific details on testing, documentation updates, and coding standards.
-- **Code of conduct**: Add a `CODE_OF_CONDUCT.md` file to outline the expected behavior and guidelines for contributors.
-- **Issue and pull request templates**: Ensure the `.github/ISSUE_TEMPLATE/` directory contains templates for bug reports and feature requests to standardize submissions.
-- **Security policy**: Include a `SECURITY.md` file to provide guidelines on reporting vulnerabilities and the project's security measures.
-- **Additional resources**: Provide links to relevant documentation, tutorials, and other resources that can help contributors learn more about the project and its dependencies.
