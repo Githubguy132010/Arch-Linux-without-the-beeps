@@ -41,6 +41,22 @@ jobs:
             pacman -S --noconfirm --needed git archiso grub qemu
           "
 
+      - name: Record Start Time
+        run: |
+          ./scripts/record_run_time.sh start
+
+      - name: Monitor System Load
+        run: |
+          ./scripts/monitor_system_load.sh
+
+      - name: Analyze Build Complexity
+        run: |
+          ./scripts/analyze_build_complexity.sh
+
+      - name: Adjust Timeout Based on Historical Run Times
+        run: |
+          ./scripts/adjust_timeout.sh
+
       - name: Test Build
         id: build
         run: |
@@ -88,6 +104,10 @@ jobs:
             md5sum \"\$iso_file\" > checksum.md5
             sha1sum \"\$iso_file\" > checksum.sha1
           "
+
+      - name: Record End Time
+        run: |
+          ./scripts/record_run_time.sh end
 
       - name: Clean Up
         if: always()

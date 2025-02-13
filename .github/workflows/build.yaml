@@ -32,7 +32,21 @@ jobs:
           echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           echo "VERSION=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
 
+      - name: Record Start Time
+        run: |
+          ./scripts/record_run_time.sh start
 
+      - name: Monitor System Load
+        run: |
+          ./scripts/monitor_system_load.sh
+
+      - name: Analyze Build Complexity
+        run: |
+          ./scripts/analyze_build_complexity.sh
+
+      - name: Adjust Timeout Based on Historical Run Times
+        run: |
+          ./scripts/adjust_timeout.sh
 
       - name: Set up Arch Linux Container
         run: |
@@ -170,6 +184,10 @@ jobs:
           files: |
             ${{ env.WORKSPACE }}/out/*.iso
             ${{ env.WORKSPACE }}/out/*.sha*sum
+
+      - name: Record End Time
+        run: |
+          ./scripts/record_run_time.sh end
 
       - name: Clean Up
         if: always()
