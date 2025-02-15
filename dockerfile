@@ -10,6 +10,8 @@ WORKDIR /workdir
 # Copy files into the container
 COPY . .
 
-# Instead of running mkarchiso here, we leave it for later execution
+# Run mkarchiso to build the ISO
+RUN mkarchiso -v -w /workdir/workdir -o /workdir/out .
+
 # Create an entrypoint or leave it to manual execution
 CMD ["/bin/bash"]

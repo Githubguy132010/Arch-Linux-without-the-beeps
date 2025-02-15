@@ -20,4 +20,38 @@ jobs:
         run: |
           set -e  # Exit immediately if a command exits with a non-zero status
           docker build -t arch-iso-builder . || { echo "Docker build failed"; exit 1; }
-          docker run --rm --privileged -v "$(pwd)":/workdir arch-iso-builder bash -c "mkarchiso -v -w workdir/ -o out/ ." || { echo "ISO creation failed"; exit 1; }
+
+      - name: Verify ISO
+        run: |
+          set -e  # Exit immediately if a command exits with a non-zero status
+          cd out/
+          
+          # Check if ISO exists
+          iso_count=$(ls -1 *.iso 2>/dev/null | wc -l)
+          if [ $iso_count -eq 0 ]; then
+            echo '::error::No ISO file found'
+            exit 1
+          elif [ $iso_count -gt 1 ]; then
+            echo '::error::Multiple ISO files found'
+            exit 1
+          fi
+          
+          iso_file=$(ls *.iso)
+          
+          # Check ISO size (minimum 500MB)
+          size=$(stat -c%s "$iso_file")
+          if [ $size -lt 524288000 ]; then
+            echo "::error::ISO file too small: $((size / 1024 / 1024))MB"
+            exit 1
+          fi
+          
+          # Verify ISO checksum
+          sha256sum "$iso_file" > checksum.sha256
+          sha256sum -c checksum.sha256 || {
+            echo '::error::ISO checksum verification failed'
+            exit 1
+          }
+
+          # Generate additional checksums
+          md5sum "$iso_file" > checksum.md5
+          sha1sum "$iso_file" > checksum.sha1

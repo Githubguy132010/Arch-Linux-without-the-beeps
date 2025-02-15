@@ -73,10 +73,10 @@ To install Docker, follow the instructions for your operating system:
 
 3. **Build the ISO in the container**:
 
-   Build the ISO with this command:
+   The Dockerfile now includes the `mkarchiso` command to automate the ISO build process. Simply run the container to build the ISO:
 
    ```bash
-   docker run --rm --privileged -v $(pwd):/workdir arch-iso-builder bash -c "mkarchiso -v -w workdir/ -o out/ ."
+   docker run --rm --privileged -v $(pwd):/workdir arch-iso-builder
    ```
 
 4. **Retrieve the ISO**:
