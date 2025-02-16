@@ -18,10 +18,19 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '14'
+          node-version: '18'
 
       - name: Install Semantic Release
         run: npm install -g semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/github
+
+      - name: Unset Git Configurations
+        run: |
+          git config --global --unset-all user.name || true
+          git config --global --unset-all user.email || true
+
+      - name: Kill Orphan Processes
+        run: |
+          pkill -f node || true
 
       - name: Automated Tagging and Versioning
         env:
