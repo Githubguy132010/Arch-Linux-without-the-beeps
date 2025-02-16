@@ -40,8 +40,4 @@ jobs:
           FAIL_COMMENT_CONTEXT: "GitHub Actions Workflow"
           FAIL_COMMENT_DETAILS: "Check the logs for more details."
         run: |
-          export FAIL_COMMENT_NAME="Automated Tagging and Versioning"
-          export FAIL_COMMENT_MESSAGE="An error occurred during the automated tagging and versioning process."
-          export FAIL_COMMENT_CONTEXT="GitHub Actions Workflow"
-          export FAIL_COMMENT_DETAILS="Check the logs for more details."
           semantic-release
