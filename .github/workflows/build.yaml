@@ -161,6 +161,11 @@ jobs:
         id: create_release
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
+        env:
+          FAIL_COMMENT_NAME: "Create Release"
+          FAIL_COMMENT_MESSAGE: "An error occurred during the release creation process."
+          FAIL_COMMENT_CONTEXT: "GitHub Actions Workflow"
+          FAIL_COMMENT_DETAILS: "Check the logs for more details."
         with:
           tag_name: v${{ env.VERSION }}
           name: "Arch Linux No Beeps v${{ env.VERSION }}"
