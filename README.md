@@ -167,28 +167,6 @@ Dependabot can be used to automate dependency updates for GitHub Actions. Here's
 
 ---
 
-## Automated Deletion of Old Releases and Tags
-
-To keep your repository clean and manageable, you can automate the deletion of old releases and tags using GitHub Actions. This ensures that only the most recent releases are retained, reducing clutter and potential confusion.
-
-### How It Works:
-
-1. **Third-Party GitHub Action**: A third-party GitHub Action is used to delete old releases and tags.
-2. **Scheduled Workflow**: The workflow is scheduled to run periodically, ensuring that old releases and tags are deleted automatically.
-
-### Workflow File
-
-The workflow file `.github/workflows/delete-old-releases.yaml` is used to configure the automated deletion process. Here’s an overview of the workflow:
-
-- **File**: `delete-old-releases.yaml`
-- **Purpose**: Deletes old releases and tags.
-- **Steps**:
-  1. **Checkout Repository**: Pulls the latest files from the repository.
-  2. **Delete Old Releases**: Uses a third-party GitHub Action to delete old releases and tags.
-  3. **Schedule Workflow**: The workflow is scheduled to run periodically.
-
----
-
 ## Troubleshooting Common Issues
 
 ### Network Problems
