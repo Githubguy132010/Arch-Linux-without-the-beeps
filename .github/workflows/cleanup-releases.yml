@@ -1,6 +1,7 @@
 name: Cleanup Old Releases
 
 on:
+  workflow_dispatch:
   release:
     types: [published]
 
