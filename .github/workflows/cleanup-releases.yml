@@ -1,18 +1,38 @@
 name: Cleanup Old Releases
 
 on:
-  workflow_dispatch:
   release:
-    types: [published]
+    types: [created]
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
+      - name: Set up GitHub CLI
+        run: |
+          type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+          && sudo apt update \
+          && sudo apt install gh -y
+
       - name: Delete old releases
-        uses: dev-drprasad/delete-older-releases@v0.3.2
-        with:
-          keep_latest: 1
-          delete_tags: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Keep no releases (excluding current new release)
+          releases=$(gh release list --limit 100 --exclude-drafts --exclude-prereleases --json tagName,createdAt -q '.[].tagName')
+          keep=0
+          count=0
+          
+          echo "Current releases (oldest first):"
+          echo "$releases"
+          
+          for release in $releases; do
+            ((count++))
+            if ((count > keep)); then
+              echo "Deleting old release: $release"
+              gh release delete "$release" --yes
+            fi
+          done
