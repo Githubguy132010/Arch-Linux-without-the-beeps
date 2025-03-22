@@ -191,7 +191,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Keep no releases (excluding current new release)
-          releases=$(gh release list --limit 100 --exclude-drafts --exclude-prereleases --json tagName,createdAt -q '.[].tagName')
+          releases=$(gh release list --limit 100 --exclude-drafts --exclude-pre-releases --json tagName,createdAt -q '.[].tagName')
           keep=0
           count=0
           
