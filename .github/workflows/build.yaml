@@ -197,7 +197,8 @@ jobs:
         # This step runs after the GitHub CLI setup and release creation
         if: github.ref == 'refs/heads/main' && success()
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Don't set GITHUB_TOKEN here as it conflicts with gh auth
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e  # Don't exit on error
           
@@ -207,21 +208,20 @@ jobs:
           current_tag="v${{ env.VERSION }}"
           echo "ℹ️ Current release tag: $current_tag"
           
-          # Explicitly authenticate with GitHub CLI using the token
-          echo "$GITHUB_TOKEN" | gh auth login --with-token
-          
-          if [ $? -ne 0 ]; then
-            echo "::warning::Failed to authenticate with GitHub CLI. Skipping release cleanup."
-            exit 0  # Continue workflow
-          fi
+          # GitHub CLI uses GH_TOKEN environment variable automatically
+          # No need to explicitly authenticate
           
           # List all releases 
           echo "ℹ️ Listing existing releases..."
           
           # Use simple list format first to check if releases exist
-          release_count=$(gh release list | wc -l)
+          if ! release_count=$(gh release list | wc -l); then
+            echo "::warning::Failed to list releases. Skipping cleanup."
+            echo "::endgroup::"
+            exit 0
+          fi
           
-          if [ $release_count -eq 0 ]; then
+          if [ "$release_count" -eq 0 ]; then
             echo "ℹ️ No existing releases found. Nothing to clean up."
             echo "::endgroup::"
             exit 0
@@ -230,9 +230,7 @@ jobs:
           echo "ℹ️ Found $release_count releases in total"
           
           # Get detailed release info with JSON
-          releases=$(gh release list --limit 100 --json tagName,createdAt 2>/dev/null)
-          
-          if [ $? -ne 0 ] || [ -z "$releases" ]; then
+          if ! releases=$(gh release list --limit 100 --json tagName,createdAt 2>/dev/null); then
             echo "::warning::Unable to get detailed release information. Skipping cleanup."
             echo "::endgroup::"
             exit 0
