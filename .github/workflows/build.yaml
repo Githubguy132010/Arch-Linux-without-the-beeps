@@ -177,15 +177,6 @@ jobs:
             ${{ env.WORKSPACE }}/out/*.sha*sum
         
 
-      - name: Clean Up
-        if: always()
-        run: |
-          if docker ps -a | grep -q arch-container; then
-            docker stop arch-container || true
-            docker rm -f arch-container || true
-          fi
-          docker exec arch-container bash -c "sudo rm -rf /workdir/workdir/ /workdir/out/*.iso /workdir/out/*.sha*sum"
-
       - name: Set up GitHub CLI
         run: |
           type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
