@@ -12,6 +12,13 @@ on:
       - '**.md'
       - '.gitignore'
 
+# Add permissions needed for creating and managing releases
+permissions:
+  contents: write
+  packages: read
+  issues: read
+  pull-requests: read
+
 env:
   DOCKER_BUILDKIT: 1
   ISO_FILENAME: Arch.iso
@@ -175,12 +182,112 @@ jobs:
           files: |
             ${{ env.WORKSPACE }}/out/*.iso
             ${{ env.WORKSPACE }}/out/*.sha*sum
+        
 
-      - name: Clean Up
-        if: always()
+      - name: Set up GitHub CLI
         run: |
-          if docker ps -a | grep -q arch-container; then
-            docker stop arch-container || true
-            docker rm -f arch-container || true
+          type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+          && sudo apt update \
+          && sudo apt install gh -y
+
+      - name: Delete old releases
+        # This step runs after the GitHub CLI setup and release creation
+        if: github.ref == 'refs/heads/main' && success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e  # Don't exit on error
+          
+          echo "::group::Release Cleanup"
+          
+          # Get current release tag we're creating
+          current_tag="v${{ env.VERSION }}"
+          echo "ℹ️ Current release tag: $current_tag"
+          
+          # Explicitly authenticate with GitHub CLI using the token
+          echo "$GITHUB_TOKEN" | gh auth login --with-token
+          
+          if [ $? -ne 0 ]; then
+            echo "::warning::Failed to authenticate with GitHub CLI. Skipping release cleanup."
+            exit 0  # Continue workflow
           fi
-          sudo rm -rf workdir/ out/*.iso out/*.sha*sum
+          
+          # List all releases 
+          echo "ℹ️ Listing existing releases..."
+          
+          # Use simple list format first to check if releases exist
+          release_count=$(gh release list | wc -l)
+          
+          if [ $release_count -eq 0 ]; then
+            echo "ℹ️ No existing releases found. Nothing to clean up."
+            echo "::endgroup::"
+            exit 0
+          fi
+          
+          echo "ℹ️ Found $release_count releases in total"
+          
+          # Get detailed release info with JSON
+          releases=$(gh release list --limit 100 --json tagName,createdAt 2>/dev/null)
+          
+          if [ $? -ne 0 ] || [ -z "$releases" ]; then
+            echo "::warning::Unable to get detailed release information. Skipping cleanup."
+            echo "::endgroup::"
+            exit 0
+          fi
+          
+          # Check if jq command is available
+          if ! command -v jq &> /dev/null; then
+            echo "::warning::jq command not found. Installing jq..."
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+          
+          # Parse releases, handling potential JSON parsing errors
+          if ! old_releases=($(echo "$releases" | jq -r 'sort_by(.createdAt) | .[].tagName' 2>/dev/null)); then
+            echo "::warning::Failed to parse release information. Skipping cleanup."
+            echo "::endgroup::"
+            exit 0
+          fi
+          
+          # Number of releases to keep (0 means delete all old releases)
+          keep=0
+          count=0
+          total=${#old_releases[@]}
+          
+          echo "ℹ️ Found $total releases after parsing"
+          
+          # Delete all releases except the most recent 'keep' number and current release
+          for tag in "${old_releases[@]}"; do
+            # Skip the current release
+            if [[ "$tag" == "$current_tag" ]]; then
+              echo "ℹ️ Skipping current release: $tag"
+              continue
+            fi
+            
+            ((count++))
+            if ((count > keep)); then
+              echo "🗑️ Attempting to delete release: $tag"
+              
+              # Try to delete the release with a timeout
+              if timeout 30s gh release delete "$tag" --yes; then
+                echo "✅ Successfully deleted release: $tag"
+              else
+                deletion_status=$?
+                echo "::warning::Failed to delete release $tag (exit code: $deletion_status) - continuing with next release"
+              fi
+              
+              # Small delay to avoid rate limiting
+              sleep 1
+            else
+              echo "🔒 Keeping release: $tag (within keep limit)"
+            fi
+          done
+          
+          echo "🏁 Release cleanup completed"
+          echo "::endgroup::"
+          
+          # Always return success to avoid workflow failures
+          exit 0
+
