@@ -190,19 +190,38 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Keep no releases (excluding current new release)
-          releases=$(gh release list --limit 100 --exclude-drafts --exclude-pre-releases --json tagName,createdAt -q '.[].tagName')
+          # Get current release tag we're creating
+          current_tag="v${{ env.VERSION }}"
+          echo "Current release tag: $current_tag"
+          
+          # List all releases excluding the current one we're creating
+          # Sort by creation date (oldest first)
+          echo "Listing existing releases..."
+          readarray -t old_releases < <(gh release list --limit 100 --exclude-drafts --exclude-pre-releases --json tagName,createdAt --jq 'sort_by(.createdAt) | .[].tagName')
+          
+          # Keep no old releases
           keep=0
           count=0
+          total=${#old_releases[@]}
           
-          echo "Current releases (oldest first):"
-          echo "$releases"
+          echo "Found $total existing releases"
           
-          for release in $releases; do
+          # Delete all releases except the most recent 'keep' number
+          for tag in "${old_releases[@]}"; do
+            # Skip the current release if it somehow appears in the list
+            if [[ "$tag" == "$current_tag" ]]; then
+              echo "Skipping current release: $tag"
+              continue
+            fi
+            
             ((count++))
             if ((count > keep)); then
-              echo "Deleting old release: $release"
-              gh release delete "$release" --yes
+              echo "Deleting old release: $tag"
+              gh release delete "$tag" --yes || echo "Failed to delete release $tag"
+            else
+              echo "Keeping release: $tag"
             fi
           done
+          
+          echo "Release cleanup complete"
 
