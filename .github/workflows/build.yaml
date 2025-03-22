@@ -12,6 +12,13 @@ on:
       - '**.md'
       - '.gitignore'
 
+# Add permissions needed for creating and managing releases
+permissions:
+  contents: write
+  packages: read
+  issues: read
+  pull-requests: read
+
 env:
   DOCKER_BUILDKIT: 1
   ISO_FILENAME: Arch.iso
@@ -188,6 +195,8 @@ jobs:
 
       - name: Delete old releases
         env:
+          # We need to use a token with sufficient permissions
+          # Using GITHUB_TOKEN with proper permissions defined at workflow level
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Get current release tag we're creating
@@ -195,11 +204,18 @@ jobs:
           echo "Current release tag: $current_tag"
           
           # List all releases excluding the current one we're creating
-          # Sort by creation date (oldest first)
           echo "Listing existing releases..."
-          readarray -t old_releases < <(gh release list --limit 100 --exclude-drafts --exclude-pre-releases --json tagName,createdAt --jq 'sort_by(.createdAt) | .[].tagName')
           
-          # Keep no old releases
+          # Try to get releases, handling potential errors
+          if ! releases=$(gh release list --limit 100 --exclude-drafts --exclude-pre-releases --json tagName,createdAt); then
+            echo "::warning::Unable to list releases, skipping cleanup"
+            exit 0
+          fi
+          
+          # Parse the JSON output and extract tag names sorted by creation date
+          readarray -t old_releases < <(echo "$releases" | jq -r 'sort_by(.createdAt) | .[].tagName')
+          
+          # Keep no old releases (excluding current new release)
           keep=0
           count=0
           total=${#old_releases[@]}
@@ -216,8 +232,12 @@ jobs:
             
             ((count++))
             if ((count > keep)); then
-              echo "Deleting old release: $tag"
-              gh release delete "$tag" --yes || echo "Failed to delete release $tag"
+              echo "Attempting to delete release: $tag"
+              if gh release delete "$tag" --yes; then
+                echo "Successfully deleted release: $tag"
+              else
+                echo "::warning::Failed to delete release $tag - this is non-fatal"
+              fi
             else
               echo "Keeping release: $tag"
             fi
