@@ -1,0 +1,17 @@
+[Unit]
+Description=Disable system beeps
+Documentation=https://github.com/Githubguy132010/Arch-Linux-without-the-beeps
+DefaultDependencies=no
+Before=sysinit.target
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c "rmmod pcspkr snd_pcsp 2>/dev/null || true"
+ExecStart=/bin/bash -c "echo 'blacklist pcspkr' > /etc/modprobe.d/nobeep.conf"
+ExecStart=/bin/bash -c "echo 'blacklist snd_pcsp' >> /etc/modprobe.d/nobeep.conf"
+ExecStart=/bin/bash -c "if [ -f /sys/module/i8042/parameters/nopnp ]; then echo 1 > /sys/module/i8042/parameters/nopnp; fi"
+
+[Install]
+WantedBy=sysinit.target
