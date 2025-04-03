@@ -83,14 +83,12 @@ EOF
     export JOBS=$(nproc)
     log "Using $JOBS processors for parallel compression"
     
-    # Run mkarchiso with optimized parameters
-    log "Building Arch ISO with mkarchiso..."
-    MKARCHISO_OPTS="-v"
-    if [ "$JOBS" -gt 1 ]; then
-        MKARCHISO_OPTS+=" -C xz:threads=$JOBS"
-    fi
+    # Note: We don't modify profiledef.sh anymore as -Xthreads is not supported by mksquashfs
+    # The profiledef.sh file already has proper XZ compression settings
     
-    mkarchiso $MKARCHISO_OPTS -w "$work_dir" -o "$output_dir" .
+    # Run mkarchiso with verbose option only
+    log "Building Arch ISO with mkarchiso..."
+    mkarchiso -v -w "$work_dir" -o "$output_dir" .
     
     # Check if build was successful
     if [ $? -eq 0 ]; then

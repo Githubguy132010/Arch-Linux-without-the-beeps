@@ -39,8 +39,6 @@ jobs:
           echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           echo "VERSION=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
 
-
-
       - name: Set up Arch Linux Container
         run: |
           docker run --privileged --name arch-container -d \
@@ -74,6 +72,21 @@ jobs:
             }
           "
 
+      - name: Download previous package versions
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true
+        run: |
+          mkdir -p /tmp/package-versions
+          # Try to download the package versions file from the previous release
+          if ! gh release download --pattern "package_versions.txt" --dir "/tmp/package-versions" 2>/dev/null; then
+            echo "No previous package_versions.txt found, will create new one."
+          else
+            echo "Downloaded previous package versions file."
+            mv /tmp/package-versions/package_versions.txt /tmp/package-versions/previous_versions.txt
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build ISO
         id: build
         run: |
@@ -104,6 +117,23 @@ jobs:
               echo '::error::ISO file not found after build'
               exit 1
             }
+          "
+
+      - name: Generate Package Updates
+        id: package_updates
+        run: |
+          docker exec arch-container bash -c "
+            set -euo pipefail
+            cd /workdir
+            
+            # Make package tracking script executable
+            chmod +x scripts/package_tracking/track_package_updates.sh
+            
+            # Run the package tracking script
+            ./scripts/package_tracking/track_package_updates.sh
+            
+            # Copy current version file for next build
+            cp /tmp/package-versions/current_versions.txt /workdir/out/package_versions.txt
           "
 
       - name: Generate Checksums
@@ -153,6 +183,12 @@ jobs:
             -F previous_tag_name="$(git describe --tags --abbrev=0 2>/dev/null || echo '')" \
             | jq -r '.body' >> $TEMP_RELEASE_NOTES
           
+          # Include package updates in release notes if they exist
+          if [ -f "/tmp/package-versions/package_updates.md" ]; then
+            echo "" >> $TEMP_RELEASE_NOTES
+            cat "/tmp/package-versions/package_updates.md" >> $TEMP_RELEASE_NOTES
+          fi
+          
           # Add standard information
           {
             echo ""
@@ -189,6 +225,7 @@ jobs:
           files: |
             ${{ env.WORKSPACE }}/out/*.iso
             ${{ env.WORKSPACE }}/out/*.sha*sum
+            ${{ env.WORKSPACE }}/out/package_versions.txt
         
 
       - name: Set up GitHub CLI
