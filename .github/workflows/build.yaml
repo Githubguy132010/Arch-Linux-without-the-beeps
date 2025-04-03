@@ -85,6 +85,13 @@ jobs:
             rm -rf workdir/ out/
             mkdir -p out/
             
+            # Fix the profiledef.sh file to ensure correct SquashFS options
+            sed -i 's/-threads/-Xcompression-threads/' profiledef.sh || true
+            
+            # Verify SquashFS options
+            echo '=== Checking SquashFS options in profiledef.sh ==='
+            grep 'airootfs_image_tool_options' profiledef.sh
+            
             # Build the ISO with verbose output
             mkarchiso -v -w workdir/ -o out/ . 2>&1 | tee build.log || {
               echo '::error::ISO build failed!'

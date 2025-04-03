@@ -6,18 +6,57 @@ on:
   workflow_dispatch:
   schedule:
     # Run the workflow on the 1st of every month at midnight
-    - cron: 0 0 * * *
+    - cron: '0 0 1 * *'
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # Use a standard runner
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # Add a timeout to prevent hung builds
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Build and Run Docker container
+      - name: Set up Environment
         run: |
-          set -e  # Exit immediately if a command exits with a non-zero status
-          docker build -t arch-iso-builder . || { echo "Docker build failed"; exit 1; }
-          docker run --rm --privileged -v "$(pwd)":/workdir arch-iso-builder bash -c "mkarchiso -v -w workdir/ -o out/ ." || { echo "ISO creation failed"; exit 1; }
+          echo "Setting up environment..."
+          mkdir -p out
+          chmod +x scripts/entrypoint.sh
+          chmod +x scripts/select-mirrors.sh
+          chmod +x profiledef.sh
+
+      - name: Build Docker Image
+        run: |
+          echo "Building Docker image..."
+          docker build -t arch-iso-builder . || { 
+            echo "::error::Docker build failed"
+            exit 1
+          }
+
+      - name: Validate Configuration
+        run: |
+          echo "Validating configuration..."
+          docker run --rm -v "$(pwd)":/workdir arch-iso-builder validate || {
+            echo "::error::Configuration validation failed"
+            exit 1
+          }
+
+      - name: Build ISO
+        run: |
+          echo "Building ISO..."
+          # Create a small-scale test build with output to verify the process works
+          docker run --rm --privileged \
+            -v "$(pwd)":/workdir \
+            arch-iso-builder build out work || {
+              echo "::error::ISO build failed"
+              exit 1
+            }
+          
+          # Verify that output directory contains files
+          if [ ! -d "out" ] || [ -z "$(ls -A out 2>/dev/null)" ]; then
+            echo "::error::Output directory is empty or does not exist"
+            exit 1
+          else
+            echo "ISO build process completed successfully!"
+            ls -la out
+          fi
