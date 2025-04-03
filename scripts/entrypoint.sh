@@ -83,13 +83,10 @@ EOF
     export JOBS=$(nproc)
     log "Using $JOBS processors for parallel compression"
     
-    # Check if thread parameter is already in profiledef.sh
-    if ! grep -q '\-Xthreads' profiledef.sh; then
-        log "Adding XZ thread parameter to profiledef.sh"
-        sed -i '/airootfs_image_tool_options=/s/)/ \x27-Xthreads\x27 \x27'"$JOBS"'\x27)/' profiledef.sh
-    fi
+    # Note: We don't modify profiledef.sh anymore as -Xthreads is not supported by mksquashfs
+    # The profiledef.sh file already has proper XZ compression settings
     
-    # Run mkarchiso with verbose option only (no thread parameter on command line)
+    # Run mkarchiso with verbose option only
     log "Building Arch ISO with mkarchiso..."
     mkarchiso -v -w "$work_dir" -o "$output_dir" .
     
