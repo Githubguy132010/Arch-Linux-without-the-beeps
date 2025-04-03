@@ -14,14 +14,17 @@ bootmodes=('bios.syslinux.mbr' 'bios.syslinux.eltorito'
 arch="x86_64"
 pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"
-# Use better compression options correctly formatted for mksquashfs
+
+# Use better compression options correctly formatted for mksquashfs with XZ
+# XZ compressor supports these options: -Xbcj and -Xdict-size
 if [ "$(nproc)" -gt 2 ]; then
-  # For multi-core systems: use XZ with bcj x86 filter and multi-threaded compression
-  airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '1M' '-Xcompression-level' '9')
-else
-  # For single/dual-core systems: use faster but less effective compression
+  # For multi-core systems: use XZ with bcj x86 filter for better compression
   airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '1M')
+else
+  # For single/dual-core systems: use the same options but may be slower
+  airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '75%')
 fi
+
 bootstrap_tarball_compression=('zstd' '-c' '-T0' '--auto-threads=logical' '--long' '-19')
 file_permissions=(
   ["/etc/shadow"]="0:0:400"
