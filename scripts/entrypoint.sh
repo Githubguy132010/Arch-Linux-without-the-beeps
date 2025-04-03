@@ -83,14 +83,15 @@ EOF
     export JOBS=$(nproc)
     log "Using $JOBS processors for parallel compression"
     
-    # Run mkarchiso with optimized parameters
-    log "Building Arch ISO with mkarchiso..."
-    MKARCHISO_OPTS="-v"
-    if [ "$JOBS" -gt 1 ]; then
-        MKARCHISO_OPTS+=" -C xz:threads=$JOBS"
+    # Check if thread parameter is already in profiledef.sh
+    if ! grep -q '\-Xthreads' profiledef.sh; then
+        log "Adding XZ thread parameter to profiledef.sh"
+        sed -i '/airootfs_image_tool_options=/s/)/ \x27-Xthreads\x27 \x27'"$JOBS"'\x27)/' profiledef.sh
     fi
     
-    mkarchiso $MKARCHISO_OPTS -w "$work_dir" -o "$output_dir" .
+    # Run mkarchiso with verbose option only (no thread parameter on command line)
+    log "Building Arch ISO with mkarchiso..."
+    mkarchiso -v -w "$work_dir" -o "$output_dir" .
     
     # Check if build was successful
     if [ $? -eq 0 ]; then
