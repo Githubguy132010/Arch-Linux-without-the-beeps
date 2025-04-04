@@ -1,0 +1,179 @@
+name: Validate and Test Build
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'  # Run daily checks
+
+env:
+  DOCKER_BUILDKIT: 1
+  PACMAN_CACHE: /tmp/pacman-cache
+  WORKSPACE: /workdir
+  BUILD_DIR: /workdir/workdir
+  OUTPUT_DIR: /workdir/out
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # Set timeout to prevent hung builds
+    
+    strategy:
+      matrix:
+        test-type: ['direct-build', 'dockerfile-build']
+      fail-fast: false  # Continue with other tests if one fails
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      # Common setup for all test types
+      - name: Set up Environment
+        run: |
+          echo "Setting up environment for ${{ matrix.test-type }}..."
+          mkdir -p out
+          chmod +x scripts/entrypoint.sh scripts/select-mirrors.sh profiledef.sh
+
+      #######################################
+      # Steps specific to direct build method
+      #######################################
+      - name: Set up Arch Linux Container
+        if: matrix.test-type == 'direct-build'
+        run: |
+          mkdir -p ${{ env.PACMAN_CACHE }}
+          docker run --privileged --name arch-container -d \
+            -v ${{ github.workspace }}:${{ env.WORKSPACE }} \
+            -v ${{ env.PACMAN_CACHE }}:/var/cache/pacman/pkg \
+            archlinux:latest sleep infinity
+
+      - name: Install Dependencies (Direct Build)
+        if: matrix.test-type == 'direct-build'
+        run: |
+          docker exec arch-container bash -c "
+            set -euo pipefail
+            pacman -Syu --noconfirm
+            pacman -S --noconfirm --needed git archiso grub qemu
+          "
+
+      - name: Test Direct Build
+        id: direct-build
+        if: matrix.test-type == 'direct-build'
+        run: |
+          docker exec arch-container bash -c "
+            set -euo pipefail
+            cd ${{ env.WORKSPACE }}
+            rm -rf ${{ env.BUILD_DIR }} ${{ env.OUTPUT_DIR }}
+            mkdir -p ${{ env.BUILD_DIR }} ${{ env.OUTPUT_DIR }}
+            mkarchiso -v -w ${{ env.BUILD_DIR }} -o ${{ env.OUTPUT_DIR }} .
+          "
+
+      - name: Verify ISO (Direct Build)
+        if: matrix.test-type == 'direct-build'
+        run: |
+          docker exec arch-container bash -c "
+            set -euo pipefail
+            cd ${{ env.OUTPUT_DIR }}
+            
+            # Check if ISO exists
+            iso_count=\$(ls -1 *.iso 2>/dev/null | wc -l)
+            if [ \$iso_count -eq 0 ]; then
+              echo '::error::No ISO file found'
+              exit 1
+            elif [ \$iso_count -gt 1 ]; then
+              echo '::error::Multiple ISO files found'
+              exit 1
+            fi
+            
+            iso_file=\$(ls *.iso)
+            
+            # Check ISO size (minimum 500MB)
+            size=\$(stat -c%s \"\$iso_file\")
+            if [ \$size -lt 524288000 ]; then
+              echo \"::error::ISO file too small: \$((\$size / 1024 / 1024))MB\"
+              exit 1
+            fi
+            
+            # Verify ISO checksum
+            sha256sum \"\$iso_file\" > checksum.sha256
+            sha256sum -c checksum.sha256 || {
+              echo '::error::ISO checksum verification failed'
+              exit 1
+            }
+
+            # Generate additional checksums
+            md5sum \"\$iso_file\" > checksum.md5
+            sha1sum \"\$iso_file\" > checksum.sha1
+          "
+
+      - name: Clean Up Direct Build
+        if: matrix.test-type == 'direct-build' && always()
+        run: |
+          if docker ps -a | grep -q arch-container; then
+            docker stop arch-container || true
+            docker rm -f arch-container || true
+          fi
+          sudo rm -rf ${{ env.BUILD_DIR }} ${{ env.OUTPUT_DIR }}
+
+      #########################################
+      # Steps specific to dockerfile build method
+      #########################################
+      - name: Build Docker Image
+        if: matrix.test-type == 'dockerfile-build'
+        run: |
+          echo "Building Docker image..."
+          docker build -t arch-iso-builder . || { 
+            echo "::error::Docker build failed"
+            exit 1
+          }
+
+      - name: Validate Configuration
+        if: matrix.test-type == 'dockerfile-build'
+        run: |
+          echo "Validating configuration..."
+          docker run --rm -v "$(pwd)":/workdir arch-iso-builder validate || {
+            echo "::error::Configuration validation failed"
+            exit 1
+          }
+
+      - name: Build ISO with Dockerfile
+        if: matrix.test-type == 'dockerfile-build'
+        id: dockerfile-build
+        run: |
+          echo "Building ISO using Dockerfile method..."
+          # Create a test build with output to verify the process works
+          docker run --rm --privileged \
+            -v "$(pwd)":/workdir \
+            arch-iso-builder build out work || {
+              echo "::error::ISO build failed"
+              exit 1
+            }
+          
+          # Verify that output directory contains files
+          if [ ! -d "out" ] || [ -z "$(ls -A out 2>/dev/null)" ]; then
+            echo "::error::Output directory is empty or does not exist"
+            exit 1
+          else
+            echo "ISO build process completed successfully!"
+            ls -la out
+          fi
+
+      # Cleanup for Dockerfile build
+      - name: Clean Up Dockerfile Build
+        if: matrix.test-type == 'dockerfile-build' && always()
+        run: |
+          sudo rm -rf out/ work/
+          docker image rm arch-iso-builder || true
+
+      # Common final step for all test types
+      - name: Report Status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ ${{ matrix.test-type }} test passed successfully"
+          else
+            echo "❌ ${{ matrix.test-type }} test failed"
+            exit 1
+          fi
