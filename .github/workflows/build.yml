@@ -1,0 +1,117 @@
+name: Build ISO
+
+on:
+  # Allows manual triggering
+  workflow_dispatch:
+  # Run daily at midnight UTC
+  schedule:
+    - cron: '0 0 * * *'
+
+env:
+  DOCKER_BUILDKIT: 1
+  PACMAN_CACHE: /tmp/pacman-cache
+  WORKSPACE: /workdir
+  BUILD_DIR: /workdir/work
+  OUTPUT_DIR: /workdir/out
+
+jobs:
+  build:
+    name: Build Arch Linux ISO
+    runs-on: ubuntu-latest
+    timeout-minutes: 180  # Extended timeout for the full build process
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Environment
+        run: |
+          echo "Setting up build environment"
+          mkdir -p out work
+          echo "ISO_DATE=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
+          echo "RELEASE_TAG=v$(date +'%Y.%m.%d')" >> $GITHUB_ENV
+
+      - name: Cache Pacman packages
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.PACMAN_CACHE }}
+          key: archlinux-pacman-${{ github.run_id }}
+          restore-keys: |
+            archlinux-pacman-
+
+      - name: Set up Docker Container
+        run: |
+          mkdir -p ${{ env.PACMAN_CACHE }}
+          docker build -t arch-iso-builder -f dockerfile .
+
+      - name: Build ISO
+        run: |
+          # Run the ISO build with privileged mode to allow loop device mounting
+          docker run --rm --privileged \
+            -v ${{ github.workspace }}:${{ env.WORKSPACE }} \
+            -v ${{ env.PACMAN_CACHE }}:/var/cache/pacman/pkg \
+            arch-iso-builder build out work
+
+      - name: Generate Checksums
+        run: |
+          cd out
+          ISO_FILE=$(ls *.iso)
+          echo "ISO_FILENAME=$ISO_FILE" >> $GITHUB_ENV
+          
+          # Create checksums
+          sha256sum "$ISO_FILE" > $ISO_FILE.sha256
+          sha512sum "$ISO_FILE" > $ISO_FILE.sha512
+          
+          # Rename ISO for better identification
+          RENAMED_ISO="archlinux-nobeep-${{ env.ISO_DATE }}.iso"
+          mv "$ISO_FILE" "$RENAMED_ISO"
+          echo "RENAMED_ISO=$RENAMED_ISO" >> $GITHUB_ENV
+
+      - name: Generate Package Updates for Release Notes
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:${{ env.WORKSPACE }} \
+            arch-iso-builder bash -c "cd ${{ env.WORKSPACE }} && ./scripts/package_tracking/track_package_updates.sh"
+          
+          # Prepare release notes
+          echo "Generating release notes"
+          {
+            echo "# Arch Linux No Beep ISO - ${{ env.ISO_DATE }}"
+            echo ""
+            echo "## 📦 Automated Build"
+            echo ""
+            echo "This ISO was automatically built on $(date +'%Y-%m-%d %H:%M:%S %Z')"
+            echo ""
+            echo "### 🔧 Changes"
+            echo ""
+            echo "- Updated base packages to latest Arch Linux versions"
+            echo "- All system beeps disabled by default"
+            echo "- Performance optimizations for faster boot"
+            echo ""
+            if [ -f "/tmp/package-versions/package_updates.md" ]; then
+              cat "/tmp/package-versions/package_updates.md"
+            else
+              echo "No detailed package information available for this build."
+            fi
+          } > release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            out/${{ env.RENAMED_ISO }}
+            out/${{ env.RENAMED_ISO }}.sha256
+            out/${{ env.RENAMED_ISO }}.sha512
+          name: "Arch Linux No Beep - ${{ env.ISO_DATE }}"
+          tag_name: ${{ env.RELEASE_TAG }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean Up
+        if: always()
+        run: |
+          sudo rm -rf out/ work/
+          docker image rm arch-iso-builder || true
