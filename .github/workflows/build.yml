@@ -41,21 +41,37 @@ jobs:
 
       - name: Set up Docker Container
         run: |
+          # Ensure package cache directory exists
           mkdir -p ${{ env.PACMAN_CACHE }}
-          docker build -t arch-iso-builder -f dockerfile .
+          # Build the Docker image with proper error handling
+          docker build -t arch-iso-builder -f dockerfile . || {
+            echo "::error::Failed to build Docker image"
+            exit 1
+          }
 
       - name: Build ISO
         run: |
           # Run the ISO build with privileged mode to allow loop device mounting
+          # The 'build' command is passed to the entrypoint script
           docker run --rm --privileged \
             -v ${{ github.workspace }}:${{ env.WORKSPACE }} \
             -v ${{ env.PACMAN_CACHE }}:/var/cache/pacman/pkg \
-            arch-iso-builder build out work
+            arch-iso-builder build out work || {
+              echo "::error::ISO build failed"
+              exit 1
+            }
 
       - name: Generate Checksums
         run: |
           cd out
-          ISO_FILE=$(ls *.iso)
+          # Check if ISO file exists
+          if ! ls *.iso &>/dev/null; then
+            echo "::error::No ISO file found in output directory"
+            exit 1
+          fi
+          
+          # Get the ISO filename
+          ISO_FILE=$(ls *.iso | head -n1)
           echo "ISO_FILENAME=$ISO_FILE" >> $GITHUB_ENV
           
           # Create checksums
@@ -69,9 +85,19 @@ jobs:
 
       - name: Generate Package Updates for Release Notes
         run: |
+          # Create directory for package tracking output
+          mkdir -p /tmp/package-versions
+          
+          # Run package tracking script with proper error handling
+          echo "Running package tracking script..."
           docker run --rm \
             -v ${{ github.workspace }}:${{ env.WORKSPACE }} \
-            arch-iso-builder bash -c "cd ${{ env.WORKSPACE }} && ./scripts/package_tracking/track_package_updates.sh"
+            -v /tmp/package-versions:/tmp/package-versions \
+            arch-iso-builder shell "cd ${{ env.WORKSPACE }} && ./scripts/package_tracking/track_package_updates.sh" || {
+              echo "::warning::Package tracking failed, continuing with simplified release notes"
+              # Ensure the directory exists even if command failed
+              mkdir -p /tmp/package-versions
+            }
           
           # Prepare release notes
           echo "Generating release notes"
@@ -89,11 +115,21 @@ jobs:
             echo "- Performance optimizations for faster boot"
             echo ""
             if [ -f "/tmp/package-versions/package_updates.md" ]; then
+              echo "### 📊 Package Updates"
+              echo ""
               cat "/tmp/package-versions/package_updates.md"
             else
               echo "No detailed package information available for this build."
             fi
           } > release_notes.md
+          
+          # Verify release notes were created
+          if [ ! -s release_notes.md ]; then
+            echo "::warning::Release notes file is empty, creating fallback content"
+            echo "# Arch Linux No Beep ISO - ${{ env.ISO_DATE }}" > release_notes.md
+            echo "" >> release_notes.md
+            echo "This ISO was automatically built on $(date +'%Y-%m-%d %H:%M:%S %Z')" >> release_notes.md
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
