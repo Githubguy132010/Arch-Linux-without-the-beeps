@@ -32,7 +32,7 @@ jobs:
           echo "RELEASE_TAG=v$(date +'%Y.%m.%d')" >> $GITHUB_ENV
 
       - name: Cache Pacman packages
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ env.PACMAN_CACHE }}
           key: archlinux-pacman-${{ github.run_id }}
