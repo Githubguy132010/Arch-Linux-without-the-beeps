@@ -1,0 +1,18 @@
+# Package Tracking Configuration Example
+# Copy this file to /etc/package_tracking/config.conf to customize settings
+
+# Logging options
+LOG_FILE="/var/log/package_tracking.log"
+LOG_LEVEL="INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+
+# Data storage
+DATA_DIR="/tmp/package-versions"
+
+# Update settings
+REPOS="core extra community multilib"  # Repositories to check for updates
+CHECK_INTERVAL=86400  # Update interval in seconds (86400 = 24 hours)
+NOTIFY="true"  # Whether to display notifications
+
+# Network settings
+TIMEOUT=30  # Connection timeout in seconds
+RETRY_COUNT=3  # Number of retries for network operations
