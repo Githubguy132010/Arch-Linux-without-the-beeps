@@ -1,0 +1,13 @@
+[Unit]
+Description=Disable virtual console beeps
+Documentation=https://github.com/Githubguy132010/Arch-Linux-without-the-beeps
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Disable console beeps for all virtual terminals
+ExecStart=/usr/bin/bash -c 'for tty in /dev/tty[0-9]*; do if [ -w "$tty" ]; then setterm -blength 0 > $tty; fi; done'
+
+[Install]
+WantedBy=multi-user.target
