@@ -1,0 +1,4 @@
+! Disable audible bell
+XTerm*bellIsUrgent: false
+XTerm*visualBell: false
+XTerm*bellSupressTime: 0

@@ -1,0 +1,5 @@
+# Disable terminal bell
+set bell-style none
+
+# Include system-wide settings
+$include /etc/inputrc
