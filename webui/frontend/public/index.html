@@ -2,17 +2,93 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="Arch Linux without the beeps - ISO Builder WebUI"
-    />
+    <meta name="theme-color" content="#1793d1" />
+    <meta name="description" content="Arch Linux ISO Builder without the beeps" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <title>Arch Linux No-Beep ISO Builder</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+    <!-- Add fallback styles to prevent white screen during loading -->
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+          'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background-color: #f5f5f5;
+      }
+      
+      #root {
+        min-height: 100vh;
+      }
+      
+      .loading-fallback {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        color: #333;
+      }
+      
+      .loading-indicator {
+        border: 4px solid rgba(23, 147, 209, 0.3);
+        border-top: 4px solid #1793d1;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Initial loading state to avoid white screen -->
+      <div class="loading-fallback">
+        <div class="loading-indicator"></div>
+        <p>Loading Arch Linux ISO Builder...</p>
+      </div>
+    </div>
+    <!-- Add error handling script for runtime errors -->
+    <script>
+      window.addEventListener('error', function(e) {
+        // Log error to console
+        console.error('Runtime error detected:', e.error);
+        
+        // Only show error UI if app hasn't loaded yet
+        if (!window.appLoaded) {
+          const rootElement = document.getElementById('root');
+          if (rootElement && rootElement.innerHTML.includes('Loading Arch Linux ISO Builder')) {
+            rootElement.innerHTML = `
+              <div style="padding: 20px; margin: 20px; background: #fff8f8; border: 1px solid #ffb6b6; border-radius: 5px;">
+                <h2 style="color: #d32f2f;">Something went wrong</h2>
+                <p>The application failed to load properly. Please try the following:</p>
+                <ul>
+                  <li>Refresh the page</li>
+                  <li>Clear your browser cache</li>
+                  <li>Check that the server is running</li>
+                </ul>
+                <p>Error details: ${e.error?.message || 'Unknown error'}</p>
+                <button 
+                  style="margin-top: 15px; padding: 8px 15px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer;"
+                  onclick="window.location.reload()">
+                  Reload Page
+                </button>
+              </div>
+            `;
+          }
+        }
+      });
+    </script>
   </body>
 </html>
