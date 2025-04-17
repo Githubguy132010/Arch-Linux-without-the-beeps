@@ -9,6 +9,7 @@ This repository provides a customized Arch Linux ISO with the system beeps disab
 - **Arch Linux Base**: Built on the latest Arch Linux, providing a clean and minimal system.
 - **Custom ISO**: Easily build and download a custom ISO with this configuration.
 - **Daily Automated Build**: ISO builds are automatically generated and released daily (if using GitHub Actions).
+- **Automatic Release Notes**: Release notes are automatically generated for each new release with categorized changes.
 
 ---
 
@@ -105,6 +106,38 @@ The GitHub Actions workflow automatically builds and releases the ISO. Here's a 
 3. **Build ISO**: The Arch ISO is customized and built using `mkarchiso`.
 4. **Upload ISO**: The ISO is uploaded as a release on GitHub with a version tag.
 5. **Silent Configuration**: Ensures that system beeps are turned off across all configurations.
+
+### Automatic Release Notes Generation
+
+This repository includes an automated workflow that generates comprehensive release notes whenever a new release is created. This feature helps contributors and users understand what changes were made between releases.
+
+#### How It Works
+
+- **When**: The workflow is triggered automatically when a new release is created in GitHub.
+- **What**: It generates release notes by analyzing commits between the current and previous release tags.
+- **Format**: The release notes are organized into categories:
+  - 🚀 **Features & Enhancements**: New features and improvements
+  - 🐛 **Bug Fixes**: Resolved issues and bugs
+  - 🔧 **Maintenance & Refactoring**: Code refactoring, documentation updates, and other maintenance tasks
+  - 📝 **Other Changes**: Any other commits not fitting in the above categories
+
+#### Commit Message Guidelines
+
+To get the most out of the automatic release notes generation, follow these commit message conventions:
+
+- Use prefixes like `feat:`, `fix:`, `docs:`, `refactor:`, `chore:` to categorize your commits
+- Write clear and descriptive commit messages that explain what the change does
+- Examples:
+  - `feat: add support for XYZ hardware`
+  - `fix: resolve system beep in network boot scenario`
+  - `docs: update build instructions for ARM architecture`
+  - `refactor: optimize silence implementation`
+
+#### Viewing Release Notes
+
+Release notes are automatically attached to each GitHub release and can be found on the [releases page](https://github.com/Githubguy132010/Arch-Linux-without-the-beeps/releases).
+
+---
 
 ### How to Trigger the GitHub Workflow
 
