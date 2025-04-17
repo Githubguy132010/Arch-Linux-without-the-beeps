@@ -131,6 +131,9 @@ jobs:
             echo "This ISO was automatically built on $(date +'%Y-%m-%d %H:%M:%S %Z')" >> release_notes.md
           fi
 
+          # Ensure DETAILED_RELEASE_NOTES.md is created
+          cp release_notes.md DETAILED_RELEASE_NOTES.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -139,7 +142,7 @@ jobs:
             out/${{ env.RENAMED_ISO }}.sha256
             out/${{ env.RENAMED_ISO }}.sha512
           name: "Arch Linux No Beeps - ${{ env.ISO_DATE }}"
-          tag_name: ${{ env.CURRENT_TAG }}
+          tag_name: ${{ env.RELEASE_TAG }}
           body_path: DETAILED_RELEASE_NOTES.md
           draft: false
           prerelease: false
