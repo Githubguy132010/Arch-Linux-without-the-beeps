@@ -6,7 +6,5 @@ updates:
     schedule:
       interval: "daily"        # Check for updates daily (previously mentioned as weekly)
       time: "08:00"            # Run every day at 08:00 UTC, day specification removed as it's redundant
-    labels:
-      - "github-actions"
     assignees:
       - "Githubguy132010"
