@@ -77,7 +77,7 @@ To install Docker, follow the instructions for your operating system:
    Build the ISO with this command:
 
    ```bash
-   docker run --rm --privileged -v $(pwd):/workdir arch-iso-builder bash -c "build out work"
+   docker run --rm --privileged -v $(pwd):/workdir arch-iso-builder build out work
    ```
 
 4. **Retrieve the ISO**:
