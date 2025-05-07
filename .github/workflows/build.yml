@@ -1,5 +1,10 @@
 name: Build ISO
 
+permissions:
+  contents: write
+  packages: read
+  pull-requests: write
+
 on:
   # Allows manual triggering
   workflow_dispatch:
