@@ -9,6 +9,9 @@ on:
   schedule:
     - cron: '0 0 * * *'  # Run daily checks
 
+permissions:
+  contents: write # Needed to push tags
+
 env:
   DOCKER_BUILDKIT: 1
   PACMAN_CACHE: /tmp/pacman-cache
@@ -17,7 +20,47 @@ env:
   OUTPUT_DIR: /workdir/out
 
 jobs:
+  check_changes:
+    if: github.event_name == 'schedule' # Only run this check for scheduled triggers
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.compare_sha.outputs.should_run }}
+    steps:
+      - name: Checkout main branch code
+        uses: actions/checkout@v4
+        with:
+          ref: main # Explicitly checkout main
+          fetch-depth: 0 # Needed for tags and full history
+
+      - name: Define Tag Name
+        id: tag_info
+        run: echo "tag_name=last-validated-main-sha" >> $GITHUB_OUTPUT
+
+      - name: Get last validated SHA and current main SHA
+        id: compare_sha
+        run: |
+          TAG_NAME="${{ steps.tag_info.outputs.tag_name }}"
+          # Fetch tags from remote to ensure we have the latest
+          git fetch --tags origin
+
+          LAST_VALIDATED_SHA=$(git rev-parse --verify "$TAG_NAME" 2>/dev/null || echo "")
+          # Get SHA of the local main branch HEAD (already checked out)
+          CURRENT_MAIN_SHA=$(git rev-parse HEAD) 
+
+          echo "Last validated SHA ($TAG_NAME): $LAST_VALIDATED_SHA"
+          echo "Current main SHA (HEAD of main): $CURRENT_MAIN_SHA"
+
+          if [ -n "$LAST_VALIDATED_SHA" ] && [ "$LAST_VALIDATED_SHA" == "$CURRENT_MAIN_SHA" ]; then
+            echo "No new commits on main since last validation."
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          else
+            echo "New commits found or first run. Proceeding with validation."
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          fi
+
   test:
+    needs: [check_changes]
+    if: ${{ github.event_name != 'schedule' || needs.check_changes.outputs.should_run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 120  # Set timeout to prevent hung builds
     
@@ -48,6 +91,16 @@ jobs:
             -v ${{ github.workspace }}:${{ env.WORKSPACE }} \
             -v ${{ env.PACMAN_CACHE }}:/var/cache/pacman/pkg \
             archlinux:latest sleep infinity
+
+      - name: Cache Pacman packages (Direct Build)
+        if: matrix.test-type == 'direct-build'
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PACMAN_CACHE }}
+          key: archlinux-pacman-v2-${{ runner.os }}-${{ hashFiles('packages.x86_64', 'bootstrap_packages.x86_64', 'pacman.conf') }}
+          restore-keys: |
+            archlinux-pacman-v2-${{ runner.os }}-
+            archlinux-pacman-v2-
 
       - name: Install Dependencies (Direct Build)
         if: matrix.test-type == 'direct-build'
@@ -159,6 +212,79 @@ jobs:
             echo "ISO build process completed successfully!"
             ls -la out
           fi
+
+      - name: Verify ISO (Dockerfile Build)
+        if: matrix.test-type == 'dockerfile-build'
+        run: |
+          set -euo pipefail
+          cd out  # The ISO is built into the 'out' directory in the workspace
+
+          echo "Listing contents of 'out' directory:"
+          ls -la
+
+          # Check if ISO exists
+          iso_count=$(ls -1 *.iso 2>/dev/null | wc -l)
+          if [ "$iso_count" -eq 0 ]; then
+            echo "::error::No ISO file found in output directory"
+            exit 1
+          elif [ "$iso_count" -gt 1 ]; then
+            echo "::error::Multiple ISO files found in output directory. Expected one."
+            ls -1 *.iso # List the files to help debug
+            exit 1
+          fi
+
+  update_last_validated_tag:
+    if: github.event_name == 'schedule' && needs.check_changes.outputs.should_run == 'true' && needs.test.result == 'success'
+    needs: [check_changes, test] # Depends on both
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main branch code
+        uses: actions/checkout@v4
+        with:
+          ref: main # Ensure we are on main to get its SHA
+      
+      - name: Define Tag Name
+        id: tag_info
+        run: echo "tag_name=last-validated-main-sha" >> $GITHUB_OUTPUT
+
+      - name: Update and Push Tag
+        run: |
+          TAG_NAME="${{ steps.tag_info.outputs.tag_name }}"
+          CURRENT_MAIN_SHA=$(git rev-parse HEAD) # SHA of local main HEAD
+          
+          echo "Updating tag $TAG_NAME to $CURRENT_MAIN_SHA"
+          git tag -f "$TAG_NAME" "$CURRENT_MAIN_SHA"
+          echo "Pushing tag $TAG_NAME to origin"
+          git push origin --force "refs/tags/$TAG_NAME"
+          
+          iso_file=$(ls *.iso | head -n1)
+          echo "Verifying ISO: $iso_file"
+          
+          # Check ISO size (minimum 500MB) - adjust if necessary
+          size=$(stat -c%s "$iso_file")
+          # Minimum size in bytes (500 * 1024 * 1024)
+          MIN_SIZE=524288000 
+          if [ "$size" -lt "$MIN_SIZE" ]; then
+            echo "::error::ISO file too small: $(($size / 1024 / 1024))MB. Minimum expected: $(($MIN_SIZE / 1024 / 1024))MB"
+            exit 1
+          fi
+          echo "ISO size: $(($size / 1024 / 1024))MB - OK"
+          
+          # Verify ISO checksum (SHA256)
+          echo "Generating and verifying SHA256 checksum..."
+          sha256sum "$iso_file" > "${iso_file}.sha256"
+          sha256sum -c "${iso_file}.sha256" || {
+            echo "::error::ISO SHA256 checksum verification failed"
+            exit 1
+          }
+          echo "SHA256 checksum verified."
+
+          # Optionally, generate other checksums (can be useful for users)
+          echo "Generating MD5 checksum..."
+          md5sum "$iso_file" > "${iso_file}.md5"
+          echo "Generating SHA1 checksum..."
+          sha1sum "$iso_file" > "${iso_file}.sha1"
+          echo "Additional checksums (MD5, SHA1) generated."
 
       # Cleanup for Dockerfile build
       - name: Clean Up Dockerfile Build

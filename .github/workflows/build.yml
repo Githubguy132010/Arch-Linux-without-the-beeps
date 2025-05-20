@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for all branches and tags
 
       - name: Setup Environment
         run: |
@@ -35,9 +37,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.PACMAN_CACHE }}
-          key: archlinux-pacman-${{ github.run_id }}
+          key: archlinux-pacman-v2-${{ runner.os }}-${{ hashFiles('packages.x86_64', 'bootstrap_packages.x86_64', 'pacman.conf') }}
           restore-keys: |
-            archlinux-pacman-
+            archlinux-pacman-v2-${{ runner.os }}-
+            archlinux-pacman-v2-
 
       - name: Set up Docker Container
         run: |
@@ -133,6 +136,76 @@ jobs:
 
           # Ensure DETAILED_RELEASE_NOTES.md is created
           cp release_notes.md DETAILED_RELEASE_NOTES.md
+
+      - name: Generate Detailed Changelog
+        id: generate_detailed_changelog
+        run: |
+          echo "Starting detailed changelog generation..."
+          CURRENT_TAG="${{ env.RELEASE_TAG }}"
+          echo "Current tag for release: $CURRENT_TAG"
+
+          # Fetch all tags from remote to ensure we have the latest state
+          git fetch --tags
+          
+          # Determine PREVIOUS_TAG
+          # Exclude the current tag from the list of potential previous tags
+          # Sort tags in descending order (v:refname for version sort)
+          PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -v "^$CURRENT_TAG$" | head -n1 || echo "")
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "No previous tag found or it's the first release. Changelog will be from the beginning of history."
+            # Use --reverse to list oldest first for better readability in release notes
+            COMMITS=$(git log --pretty=format:"- %s (%h) by @%an" --reverse HEAD)
+          else
+            echo "Generating changelog from $PREVIOUS_TAG to $CURRENT_TAG (effectively HEAD)"
+            # Use --reverse to list oldest first
+            COMMITS=$(git log --pretty=format:"- %s (%h) by @%an" --reverse $PREVIOUS_TAG..HEAD)
+          fi
+
+          if [ -z "$COMMITS" ]; then
+            echo "No commits found for the range. Setting a default message."
+            COMMITS="No specific code changes identified in this release."
+          fi
+
+          CHANGELOG_DETAILS_FILE="changelog_details.md"
+          echo "Generating changelog details into $CHANGELOG_DETAILS_FILE..."
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "## 📋 Detailed Changes from Git Log"
+            echo ""
+            echo "### 🚀 Features & Enhancements"
+            echo "$COMMITS" | grep -i -E 'feat|feature|add|enhance|implement' || echo "_No specific features/enhancements in this update based on commit messages._"
+            echo ""
+            echo "### 🐛 Bug Fixes"
+            echo "$COMMITS" | grep -i -E 'fix|bug|issue|problem|resolve' || echo "_No specific bug fixes in this update based on commit messages._"
+            echo ""
+            echo "### 🔧 Maintenance & Refactoring"
+            echo "$COMMITS" | grep -i -E 'refactor|chore|docs|test|ci|build|perf|style' || echo "_No specific maintenance/refactoring in this update based on commit messages._"
+            echo ""
+            echo "### 📝 Other Changes"
+            # The OR condition ensures that if grep finds nothing, it still prints the fallback message.
+            # This grep looks for lines NOT matching the previous categories.
+            echo "$COMMITS" | grep -v -i -E 'feat|feature|add|enhance|implement|fix|bug|issue|problem|resolve|refactor|chore|docs|test|ci|build|perf|style' || echo "_No other specific changes in this update based on commit messages._"
+            # If COMMITS was the default "No specific code changes..." message, the above grep -v would still output it.
+            # We add a specific check here to ensure if COMMITS was "No specific code changes...", it's handled gracefully by "Other Changes"
+            if [ "$COMMITS" = "No specific code changes identified in this release." ]; then
+              echo "$COMMITS"
+            fi
+            echo ""
+            echo "---"
+            if [ -n "$PREVIOUS_TAG" ]; then
+              echo "📦 Full commit history: [$PREVIOUS_TAG...${CURRENT_TAG} (HEAD)](https://github.com/${{ github.repository }}/compare/$PREVIOUS_TAG...${{ github.sha }})"
+            else
+              echo "📦 Full commit history up to this release: [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})"
+            fi
+          } > "$CHANGELOG_DETAILS_FILE"
+
+          echo "Appending $CHANGELOG_DETAILS_FILE to DETAILED_RELEASE_NOTES.md"
+          cat "$CHANGELOG_DETAILS_FILE" >> DETAILED_RELEASE_NOTES.md
+          rm -f "$CHANGELOG_DETAILS_FILE" # Clean up temp file
+          echo "Detailed changelog generation complete."
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
