@@ -1,0 +1,59 @@
+name: Delete Old Releases
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  delete-old-releases:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to delete releases
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Delete all but the most recent release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            // Get all releases
+            const releases = await github.rest.repos.listReleases({
+              owner,
+              repo,
+              per_page: 100, // Adjust as needed, max 100 per page
+            });
+
+            if (releases.data.length <= 1) {
+              console.log('Fewer than two releases found. No old releases to delete.');
+              return;
+            }
+
+            // Sort releases by creation date in descending order
+            // The first element will be the most recent release
+            const sortedReleases = releases.data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            console.log(`Found ${sortedReleases.length} releases. The most recent release is: ${sortedReleases[0].tag_name}`);
+
+            // Iterate through releases starting from the second one (index 1)
+            // and delete them. The first release (index 0) is the most recent and should be kept.
+            for (let i = 1; i < sortedReleases.length; i++) {
+              const releaseToDelete = sortedReleases[i];
+              console.log(`Attempting to delete release: ${releaseToDelete.tag_name} (ID: ${releaseToDelete.id})`);
+              try {
+                await github.rest.repos.deleteRelease({
+                  owner,
+                  repo,
+                  release_id: releaseToDelete.id,
+                });
+                console.log(`Successfully deleted release: ${releaseToDelete.tag_name}`);
+              } catch (error) {
+                console.error(`Failed to delete release ${releaseToDelete.tag_name}: ${error.message}`);
+                // Continue to try deleting other releases even if one fails
+              }
+            }
+            console.log('Finished processing old releases.');
