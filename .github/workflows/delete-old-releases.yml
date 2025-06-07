@@ -2,7 +2,7 @@ name: Delete Old Releases
 
 on:
   release:
-    types: [created]
+    types: [created, published]
   workflow_dispatch:
 
 jobs:
