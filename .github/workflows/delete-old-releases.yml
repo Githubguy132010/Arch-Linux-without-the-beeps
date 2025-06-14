@@ -4,6 +4,8 @@ on:
   release:
     types: [created, published]
   workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
 
 jobs:
   delete-old-releases:
