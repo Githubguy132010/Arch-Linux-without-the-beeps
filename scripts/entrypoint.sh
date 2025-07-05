@@ -40,7 +40,8 @@ build_iso() {
     
     # Disable PC speaker module in airootfs if present
     if [ -f "airootfs/etc/modprobe.d/nobeep.conf" ] \
-       && grep -q "pcspkr" airootfs/etc/modprobe.d/nobeep.conf 2>/dev/null; then
+       && grep -q "pcspkr" airootfs/etc/modprobe.d/nobeep.conf 2>/dev/null \
+       && grep -q "snd_pcsp" airootfs/etc/modprobe.d/nobeep.conf 2>/dev/null; then
         log "PC speaker already disabled in airootfs configuration."
     else
         log "Disabling PC speaker in airootfs configuration..."
