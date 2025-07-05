@@ -1,11 +1,10 @@
 name: Delete Old Releases
 
 on:
-  release:
-    types: [created, published]
-  workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * *'
+  workflow_run:
+    workflows: ["Build ISO"]
+    types:
+      - completed
 
 jobs:
   delete-old-releases:
