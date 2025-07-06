@@ -32,16 +32,19 @@ build_iso() {
     
     # Create necessary directories
     mkdir -p "$output_dir"
+    mkdir -p "$work_dir"
     
     # Run the mirror selection script
     log "Selecting fastest mirrors..."
     ./scripts/select-mirrors.sh || warn "Mirror selection failed, continuing with default mirrors"
     
-    # Disable PC speaker module if present
-    if grep -q "pcspkr" /etc/modprobe.d/nobeep.conf 2>/dev/null; then
-        log "PC speaker already disabled in configuration."
+    # Disable PC speaker module in airootfs if present
+    if [ -f "airootfs/etc/modprobe.d/nobeep.conf" ] \
+       && grep -q "pcspkr" airootfs/etc/modprobe.d/nobeep.conf 2>/dev/null \
+       && grep -q "snd_pcsp" airootfs/etc/modprobe.d/nobeep.conf 2>/dev/null; then
+        log "PC speaker already disabled in airootfs configuration."
     else
-        log "Disabling PC speaker in configuration..."
+        log "Disabling PC speaker in airootfs configuration..."
         mkdir -p airootfs/etc/modprobe.d/
         echo "blacklist pcspkr" > airootfs/etc/modprobe.d/nobeep.conf
         echo "blacklist snd_pcsp" >> airootfs/etc/modprobe.d/nobeep.conf
@@ -76,6 +79,7 @@ EOF
     # Set bell-style none in global inputrc
     if [ ! -f "airootfs/etc/inputrc" ]; then
         log "Setting bell-style none in global inputrc..."
+        mkdir -p airootfs/etc
         echo "set bell-style none" > airootfs/etc/inputrc
     fi
     
@@ -86,12 +90,9 @@ EOF
     # Note: We don't modify profiledef.sh anymore as -Xthreads is not supported by mksquashfs
     # The profiledef.sh file already has proper XZ compression settings
     
-    # Run mkarchiso with verbose option only
+    # Run mkarchiso with verbose option and handle errors
     log "Building Arch ISO with mkarchiso..."
-    mkarchiso -v -w "$work_dir" -o "$output_dir" .
-    
-    # Check if build was successful
-    if [ $? -eq 0 ]; then
+    if mkarchiso -v -w "$work_dir" -o "$output_dir" .; then
         log "ISO build completed successfully!"
         log "ISO available at: $output_dir"
     else
