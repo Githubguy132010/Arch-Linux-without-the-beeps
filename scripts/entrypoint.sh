@@ -76,8 +76,12 @@ EOF
     # Add settings to disable terminal bell in bash
     if [ ! -f "airootfs/etc/skel/.bashrc" ]; then
         log "Adding bash configuration to disable terminal bell..."
-        if ! mkdir -p "airootfs/etc/skel/" 2>/dev/null; then
-            warn "Failed to create skel directory, continuing..."
+if ! mkdir -p "airootfs/etc/skel/" 2>/dev/null; then
+    warn "Failed to create skel directory, continuing..."
+else
+    echo "# Disable terminal bell" > "airootfs/etc/skel/.bashrc"
+    echo "bind 'set bell-style none'" >> "airootfs/etc/skel/.bashrc"
+fi
         else
             echo "# Disable terminal bell" > "airootfs/etc/skel/.bashrc"
             echo "bind 'set bell-style none'" >> "airootfs/etc/skel/.bashrc"
