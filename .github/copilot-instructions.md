@@ -120,4 +120,4 @@ docker run --rm --privileged -v $(pwd):/workdir arch-iso-builder build out work
 - **Build improvements**: Modify `scripts/entrypoint.sh` for build logic, `dockerfile` for environment changes
 - **Documentation updates**: Update both `README.md` and `docs/BEEP_DISABLING_MECHANISMS.md` for user-facing changes
 
-This project prioritizes reliability and completeness over simplicity - every beep source must be addressed systematically across all layers of the system.
+This project prioritizes reliability and completeness over simplicity - ensuring no beeps are missed across all layers of the system.
