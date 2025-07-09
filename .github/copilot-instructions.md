@@ -14,7 +14,7 @@ This is a specialized Arch Linux ISO builder that creates a completely silent li
 - **`airootfs/`**: File system overlay that becomes the root filesystem of the live ISO
 
 ### 2. Multi-Layer Beep Suppression Strategy
-The project implements a comprehensive 5-layer approach to silence ALL beeps:
+The project implements a comprehensive 5-layer approach to silence ALL system beeps (kernel, terminal, X11, etc.):
 
 **Layer 1 - Kernel Module Blacklisting** (`airootfs/etc/modprobe.d/`)
 - `nobeep.conf`: Blacklists `pcspkr`, `snd_pcsp`, and hardware-specific beep modules
