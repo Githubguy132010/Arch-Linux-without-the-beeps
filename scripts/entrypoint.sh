@@ -53,8 +53,10 @@ build_iso() {
     # Create a custom hook to disable beeps in various config files
     if [ ! -f "airootfs/usr/share/libalpm/hooks/99-no-beep.hook" ]; then
         log "Creating custom hook to disable beeps..."
-        if ! mkdir -p "airootfs/usr/share/libalpm/hooks/" 2>/dev/null; then
-            warn "Failed to create hooks directory, continuing..."
+if ! mkdir -p "airootfs/usr/share/libalpm/hooks/" 2>/dev/null; then
+    warn "Failed to create hooks directory, continuing..."
+else
+    cat > "airootfs/usr/share/libalpm/hooks/99-no-beep.hook" << 'EOF'
         else
             cat > "airootfs/usr/share/libalpm/hooks/99-no-beep.hook" << 'EOF'
 [Trigger]
