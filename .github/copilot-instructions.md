@@ -1,142 +1,123 @@
-Guidelines for Using GitHub Copilot in Code Generation
+# Copilot Instructions: Arch Linux Without the Beeps
 
-Clear and Readable Code:
+## Project Overview
 
-Code must be generated according to strict conventions, such as camelCase or snake_case, depending on the programming language. This is crucial for ensuring consistency, facilitating comprehension, and improving the maintainability of the code, particularly in large-scale projects.
+This is a specialized Arch Linux ISO builder that creates a completely silent live environment by systematically disabling all system beeps at multiple layers. The project uses `mkarchiso` (Arch Linux's official ISO creation tool) with custom configurations to build bootable ISOs with comprehensive beep suppression.
 
-Detailed and informative annotations are mandatory, with a focus on explaining complex logic and algorithms. These annotations should strike an ideal balance between completeness and conciseness, enabling team members to collaborate efficiently and onboard new team members quickly.
+## Architecture & Core Components
 
-Functions and methods must be designed to maximize modularity. Each module should serve a specific responsibility, enhancing reusability and significantly simplifying bug fixes or extensions. Avoiding overly nested functions or methods helps to limit cyclomatic complexity.
+### 1. ISO Build System (archiso-based)
+- **`profiledef.sh`**: Main build configuration defining ISO metadata, compression settings, and build modes
+- **`packages.x86_64`**: Complete package list for the live environment (deduplicated and sorted)
+- **`bootstrap_packages.x86_64`**: Essential packages needed during the build process
+- **`pacman.conf`**: Custom pacman configuration with optimized mirror settings
+- **`airootfs/`**: File system overlay that becomes the root filesystem of the live ISO
 
-Security Measures:
+### 2. Multi-Layer Beep Suppression Strategy
+The project implements a comprehensive 5-layer approach to silence ALL beeps:
 
-Generated code must not contain known vulnerabilities, such as SQL injection, buffer overflows, or hardcoded credentials. Proactively applying security measures, such as using prepared statements and avoiding vulnerable APIs, is mandatory.
+**Layer 1 - Kernel Module Blacklisting** (`airootfs/etc/modprobe.d/`)
+- `nobeep.conf`: Blacklists `pcspkr`, `snd_pcsp`, and hardware-specific beep modules
+- `alsa-no-beep.conf`: Disables ALSA beep modes for Intel HDA drivers
+- Uses both `blacklist` and `install /bin/true` patterns for complete suppression
 
-All inputs must be thoroughly validated before being processed within the application. This includes both server-side and client-side validation. Additionally, error handling must be robust, providing clear messages and logging mechanisms that enable developers to quickly locate and resolve issues.
+**Layer 2 - Systemd Services** (`airootfs/etc/systemd/system/`)
+- `no-beep.service`: Early boot service (runs before `sysinit.target`) that forcibly unloads PC speaker modules
+- `no-console-beep.service`: Post-boot service that disables virtual terminal bells using `setterm`
+- Both use `Type=oneshot` with `RemainAfterExit=yes` for persistent state
 
-Use frameworks and libraries that enforce security automatically, such as ORMs for database interactions and modern cryptographic libraries. This minimizes the risk of human errors and promotes best practices.
+**Layer 3 - Terminal/Shell Configuration** (`airootfs/etc/skel/`)
+- `.inputrc`: Sets `bell-style none` for readline-based applications
+- `.bashrc`: Uses `bind 'set bell-style none'` for bash-specific bell disabling
+- Terminal emulator configs: Alacritty (`alacritty.yml`), XTerm (`.Xresources`), Konsole (`konsolerc`)
 
-Performance Optimization:
+**Layer 4 - X11/GUI Environment** (`airootfs/etc/X11/`)
+- `xinit/xinitrc.d/50-no-bell.sh`: Runs `xset -b` to disable X11 bell on session start
+- `xorg.conf.d/50-no-bell.conf`: Xorg input configuration to disable keyboard bells
 
-Code should be written with algorithmic efficiency in mind. This includes avoiding redundant iterations and using efficient data structures like hashmaps or balanced trees, depending on the situation.
+**Layer 5 - Boot Parameters** (in `efiboot/` and `syslinux/`)
+- Kernel parameters: `quiet vga=current loglevel=3` to minimize boot noise
+- Applied across all boot methods (UEFI, BIOS, PXE)
 
-Balancing readability and optimization is crucial, especially in critical applications such as real-time systems. Code must remain understandable for human reviewers without compromising performance.
+### 3. Containerized Build System
+- **`dockerfile`**: Multi-stage build with Arch Linux base, archiso tools, and optimized pacman config
+- **`scripts/entrypoint.sh`**: Sophisticated build orchestrator with validation, mirror selection, and error handling
+- **`scripts/select-mirrors.sh`**: Automatically selects fastest mirrors for build performance
 
-Future scalability should be considered when making design decisions. This includes anticipating peak loads, efficiently managing system resources, and integrating load-balancing solutions when necessary.
+### 4. CI/CD Pipeline (`.github/workflows/`)
+- **`build.yml`**: Daily automated builds with checksums, package tracking, and GitHub releases
+- **`release-notes.yml`**: Automated release notes generation with categorized commit analysis
+- Uses Docker privileged mode for loop device access required by `mkarchiso`
 
-Adherence to Best Practices:
+## Critical Developer Workflows
 
-Consistency in style and implementation within a project is essential. This includes following language-specific conventions, using linting tools to prevent stylistic errors, and avoiding unconventional coding practices that could cause confusion.
+### Local ISO Building
+```bash
+# Build Docker image
+docker build -t arch-iso-builder .
 
-Applying proven principles such as SOLID (Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion) and DRY (Don't Repeat Yourself) is mandatory. These principles ensure robust and maintainable designs.
+# Build ISO (requires privileged mode for loop devices)
+docker run --rm --privileged -v $(pwd):/workdir arch-iso-builder build out work
+```
 
-Avoid implementing inefficient or outdated methodologies, as these limit the flexibility and expandability of future development cycles.
+### Testing Beep Suppression
+- Use `echo -e "\a"` to test terminal bell suppression
+- Check `lsmod | grep -E 'pcspkr|snd_pcsp'` to verify module blacklisting
+- Use `xset q | grep bell` to check X11 bell status
 
-Copyright and Licensing:
+### Package Management
+- Always run `sort -u packages.x86_64 -o packages.x86_64` after modifying package lists
+- Use `scripts/package_tracking/track_package_updates.sh` for release notes generation
+- Bootstrap packages must be minimal - only what's needed for the build process
 
-Copilot must not generate code that infringes on copyrights. All generated code must fall under a permissive license unless stated otherwise. This prevents legal conflicts and ensures the integrity of the project.
+## Project-Specific Conventions
 
-All dependencies and libraries used must be thoroughly documented. This includes specifying licensing requirements and ensuring compliance with these licenses to avoid legal risks.
+### File Organization
+- **Configuration cascading**: System-wide configs in `airootfs/etc/`, user defaults in `airootfs/etc/skel/`
+- **Service ordering**: Early services use `Before=sysinit.target`, late services use `After=multi-user.target`
+- **Modular approach**: Each beep source gets dedicated configuration files rather than monolithic configs
 
-Usability:
+### Beep Suppression Patterns
+- **Defense in depth**: Always implement multiple layers - kernel, systemd, shell, GUI
+- **Graceful fallbacks**: Use `|| true` in scripts to continue if modules aren't loaded
+- **Comprehensive coverage**: Target all possible beep sources (PC speaker, ALSA, terminals, X11)
 
-User interfaces, both CLI and GUI, must be intuitive and easy to use. Unnecessary complexity should be avoided, focusing on clear navigation and accessible features.
+### Build System Conventions
+- **Error handling**: All build scripts use `set -e` and explicit error checking
+- **Logging**: Consistent color-coded logging in entrypoint script (`log()`, `warn()`, `error()`)
+- **Validation**: Always validate configuration before building (`validate()` function)
 
-Error handling in user interfaces should aim for user-friendly messages that inform the user about the nature of the error and provide practical solutions. This significantly enhances the overall user experience.
+## Integration Points
 
-Systematic implementation of internationalization (i18n) is essential to make the application accessible to a global audience. This includes supporting multiple languages and respecting regional differences in date formats, currencies, and other cultural norms.
+### archiso Integration
+- Extends standard archiso profiles with custom `profiledef.sh` and `airootfs/` overlay
+- Compression settings optimized for build performance (`airootfs_image_tool_options`)
+- Uses standard archiso hooks but adds custom beep suppression hooks
 
-Compatibility and Sustainability:
+### GitHub Actions Integration
+- Automatic daily builds triggered by cron schedule
+- Package version tracking for detailed release notes
+- Checksum generation (SHA256/SHA512) for security verification
 
-Generated code must remain up-to-date with the latest versions of programming languages and frameworks while maintaining backward compatibility. This promotes the sustainability of the codebase.
+### Docker Integration
+- Build environment isolation using official `archlinux:latest` base
+- Persistent package cache for faster rebuilds
+- Privileged container access for loop device mounting
 
-Modularity should be central to the design, allowing future changes or extensions to be implemented easily without requiring significant refactoring.
+## Key Files for Understanding Architecture
 
-Version control using tools like Git, combined with automated CI/CD pipelines, must be applied to ensure a consistent and reliable codebase.
+- **`profiledef.sh`**: Start here to understand the overall build configuration
+- **`airootfs/etc/modprobe.d/nobeep.conf`**: Core kernel-level beep suppression
+- **`scripts/entrypoint.sh`**: Complete build orchestration logic
+- **`docs/BEEP_DISABLING_MECHANISMS.md`**: Comprehensive technical documentation of all suppression mechanisms
+- **`.github/workflows/build.yml`**: CI/CD pipeline and release automation
 
-Documentation and Educational Value:
+## Common Tasks for AI Agents
 
-Each function must be accompanied by clear and concise documentation describing its functionality and limitations. This includes adding example implementations for practical application.
+- **Adding new beep suppression**: Follow the 5-layer pattern, add configs to appropriate `airootfs/` subdirectories
+- **Package management**: Modify `packages.x86_64`, ensure deduplication, update bootstrap packages if needed
+- **Service modifications**: Use systemd service templates in `airootfs/etc/systemd/system/`
+- **Build improvements**: Modify `scripts/entrypoint.sh` for build logic, `dockerfile` for environment changes
+- **Documentation updates**: Update both `README.md` and `docs/BEEP_DISABLING_MECHANISMS.md` for user-facing changes
 
-Project documentation, such as README files, must be detailed and provide clear guidelines for installation, usage, and troubleshooting. This facilitates adoption by new users and developers.
-
-Regular updates and maintenance of documentation are essential to keep it synchronized with the evolution of the project.
-
-Minimization of Dependencies:
-
-External libraries should only be used when absolutely necessary. Overuse of dependencies increases the risk of security vulnerabilities and compatibility issues.
-
-Core functionality must remain independent of external resources, ensuring the application’s robustness in various environments.
-
-Ethical Responsibility:
-
-Code must not be generated for applications that are unethical or harmful, such as malware or invasive surveillance.
-
-Risky patterns and potential security issues must be explicitly flagged with warning annotations to ensure developers are aware of the implications.
-
-Promoting ethics and social responsibility must be an integral part of the development culture, with attention to minimizing harmful impacts and maximizing positive societal contributions.
-
-### Guidelines for Using GitHub Copilot in Code Generation
-
-1. **Clear and Readable Code:**
-   - Code must be generated according to strict conventions, such as camelCase or snake_case, depending on the programming language. This is crucial for ensuring consistency, facilitating comprehension, and improving the maintainability of the code, particularly in large-scale projects.
-   - Detailed and informative annotations are mandatory, with a focus on explaining complex logic and algorithms. These annotations should strike an ideal balance between completeness and conciseness, enabling team members to collaborate efficiently and onboard new team members quickly.
-   - Functions and methods must be designed to maximize modularity. Each module should serve a specific responsibility, enhancing reusability and significantly simplifying bug fixes or extensions. Avoiding overly nested functions or methods helps to limit cyclomatic complexity.
-
-2. **Security Measures:**
-   - Generated code must not contain known vulnerabilities, such as SQL injection, buffer overflows, or hardcoded credentials. Proactively applying security measures, such as using prepared statements and avoiding vulnerable APIs, is mandatory.
-   - All inputs must be thoroughly validated before being processed within the application. This includes both server-side and client-side validation. Additionally, error handling must be robust, providing clear messages and logging mechanisms that enable developers to quickly locate and resolve issues.
-   - Use frameworks and libraries that enforce security automatically, such as ORMs for database interactions and modern cryptographic libraries. This minimizes the risk of human errors and promotes best practices.
-
-3. **Performance Optimization:**
-   - Code should be written with algorithmic efficiency in mind. This includes avoiding redundant iterations and using efficient data structures like hashmaps or balanced trees, depending on the situation.
-   - Balancing readability and optimization is crucial, especially in critical applications such as real-time systems. Code must remain understandable for human reviewers without compromising performance.
-   - Future scalability should be considered when making design decisions. This includes anticipating peak loads, efficiently managing system resources, and integrating load-balancing solutions when necessary.
-
-4. **Adherence to Best Practices:**
-   - Consistency in style and implementation within a project is essential. This includes following language-specific conventions, using linting tools to prevent stylistic errors, and avoiding unconventional coding practices that could cause confusion.
-   - Applying proven principles such as SOLID (Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion) and DRY (Don't Repeat Yourself) is mandatory. These principles ensure robust and maintainable designs.
-   - Avoid implementing inefficient or outdated methodologies, as these limit the flexibility and expandability of future development cycles.
-
-5. **Copyright and Licensing:**
-   - Copilot must not generate code that infringes on copyrights. All generated code must fall under a permissive license unless stated otherwise. This prevents legal conflicts and ensures the integrity of the project.
-   - All dependencies and libraries used must be thoroughly documented. This includes specifying licensing requirements and ensuring compliance with these licenses to avoid legal risks.
-
-6. **Usability:**
-   - User interfaces, both CLI and GUI, must be intuitive and easy to use. Unnecessary complexity should be avoided, focusing on clear navigation and accessible features.
-   - Error handling in user interfaces should aim for user-friendly messages that inform the user about the nature of the error and provide practical solutions. This significantly enhances the overall user experience.
-   - Systematic implementation of internationalization (i18n) is essential to make the application accessible to a global audience. This includes supporting multiple languages and respecting regional differences in date formats, currencies, and other cultural norms.
-
-7. **Compatibility and Sustainability:**
-   - Generated code must remain up-to-date with the latest versions of programming languages and frameworks while maintaining backward compatibility. This promotes the sustainability of the codebase.
-   - Modularity should be central to the design, allowing future changes or extensions to be implemented easily without requiring significant refactoring.
-   - Version control using tools like Git, combined with automated CI/CD pipelines, must be applied to ensure a consistent and reliable codebase.
-
-8. **Documentation and Educational Value:**
-   - Each function must be accompanied by clear and concise documentation describing its functionality and limitations. This includes adding example implementations for practical application.
-   - Project documentation, such as README files, must be detailed and provide clear guidelines for installation, usage, and troubleshooting. This facilitates adoption by new users and developers.
-   - Regular updates and maintenance of documentation are essential to keep it synchronized with the evolution of the project.
-
-9. **Minimization of Dependencies:**
-   - External libraries should only be used when absolutely necessary. Overuse of dependencies increases the risk of security vulnerabilities and compatibility issues.
-   - Core functionality must remain independent of external resources, ensuring the application’s robustness in various environments.
-
-10. **Ethical Responsibility:**
-    - Code must not be generated for applications that are unethical or harmful, such as malware or invasive surveillance.
-    - Risky patterns and potential security issues must be explicitly flagged with warning annotations to ensure developers are aware of the implications.
-    - Promoting ethics and social responsibility must be an integral part of the development culture, with attention to minimizing harmful impacts and maximizing positive societal contributions.
-
-### Best Practices for Writing Clear and Concise Documentation
-
-To write clear and concise documentation, follow these best practices:
-
-1. **Use clear and simple language**: Avoid jargon and complex sentences. Write in a way that is easy to understand for all users.
-2. **Be concise**: Keep your documentation brief and to the point. Avoid unnecessary information and focus on what is essential.
-3. **Organize content logically**: Structure your documentation in a logical order. Use headings, subheadings, and bullet points to break down information into manageable sections.
-4. **Provide examples**: Include examples to illustrate how to use the software or perform specific tasks. This helps users understand the instructions better.
-5. **Use consistent formatting**: Maintain a consistent style throughout the documentation. Use the same font, headings, and bullet points to make the document look professional and easy to read.
-6. **Include troubleshooting tips**: Add a section for common issues and their solutions. This helps users resolve problems quickly without needing additional support.
-7. **Update regularly**: Keep the documentation up to date with the latest changes in the software. Regularly review and revise the content to ensure its accuracy.
-8. **Use visuals**: Incorporate diagrams, screenshots, and other visuals to help explain complex concepts. Visual aids can make the documentation more engaging and easier to understand.
-9. **Provide links to additional resources**: Include links to related documentation, tutorials, and other resources that can help users learn more about the software.
-10. **Review and edit**: Proofread the documentation for grammar and spelling errors. Have someone else review it to ensure clarity and completeness.
+This project prioritizes reliability and completeness over simplicity - every beep source must be addressed systematically across all layers of the system.
