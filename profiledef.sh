@@ -21,8 +21,8 @@ if [ "$(nproc)" -gt 2 ]; then
   # For multi-core systems: use XZ with bcj x86 filter for better compression
   airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '1M')
 else
-  # For single/dual-core systems: use the same options but may be slower
-  airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '75%')
+  # For single/dual-core systems: use safe fixed dictionary size
+  airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '512K')
 fi
 
 bootstrap_tarball_compression=('zstd' '-c' '-T0' '--auto-threads=logical' '--long' '-19')

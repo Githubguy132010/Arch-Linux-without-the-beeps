@@ -40,7 +40,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.PACMAN_CACHE }}
-          key: archlinux-pacman-${{ github.run_id }}
+          key: archlinux-pacman-${{ hashFiles('packages.x86_64', 'bootstrap_packages.x86_64') }}
           restore-keys: |
             archlinux-pacman-
 

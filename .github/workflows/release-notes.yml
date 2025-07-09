@@ -113,3 +113,46 @@ jobs:
           fi
           
           cat $TEMP_NOTES_FILE
+          
+      - name: Update release with detailed notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Read the detailed release notes
+            const notesPath = path.join(process.env.GITHUB_WORKSPACE, 'DETAILED_RELEASE_NOTES.md');
+            let releaseNotes = '';
+            
+            try {
+              releaseNotes = fs.readFileSync(notesPath, 'utf8');
+            } catch (error) {
+              console.log('Could not read detailed release notes, using fallback');
+              releaseNotes = `## Changes in ${process.env.CURRENT_TAG}\n\nDetailed release notes could not be generated.`;
+            }
+            
+            // Get the current release
+            const { owner, repo } = context.repo;
+            const releases = await github.rest.repos.listReleases({
+              owner,
+              repo,
+              per_page: 1
+            });
+            
+            if (releases.data.length === 0) {
+              console.log('No releases found');
+              return;
+            }
+            
+            const currentRelease = releases.data[0];
+            
+            // Update the release with detailed notes
+            await github.rest.repos.updateRelease({
+              owner,
+              repo,
+              release_id: currentRelease.id,
+              body: releaseNotes
+            });
+            
+            console.log(`Updated release ${currentRelease.tag_name} with detailed notes`);

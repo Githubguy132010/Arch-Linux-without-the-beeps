@@ -18,7 +18,15 @@ log "Selecting fastest mirrors..."
 
 # Create mirror directory if it doesn't exist
 mkdir -p airootfs/etc/pacman.d/
-cp /etc/pacman.d/mirrorlist airootfs/etc/pacman.d/mirrorlist.backup 2>/dev/null || true
+
+# Backup existing mirrorlist if it exists
+if [ -f /etc/pacman.d/mirrorlist ]; then
+    cp /etc/pacman.d/mirrorlist airootfs/etc/pacman.d/mirrorlist.backup 2>/dev/null || {
+        warn "Failed to backup mirrorlist, continuing without backup"
+    }
+else
+    warn "No system mirrorlist found to backup"
+fi
 
 # Install reflector if not already installed
 if ! command -v reflector &> /dev/null; then
