@@ -191,8 +191,7 @@ get_current_versions() {
         log "DEBUG" "Found $total_packages packages to process"
         
         > "${CURRENT_VERSIONS_FILE}.tmp" # Create or truncate the temporary file
-        # Set restrictive permissions on temporary file
-        chmod 600 "${CURRENT_VERSIONS_FILE}.tmp" 2>/dev/null || true
+chmod 600 "${CURRENT_VERSIONS_FILE}.tmp" 2>/dev/null || log "WARNING" "Could not set restrictive permissions on temporary file ${CURRENT_VERSIONS_FILE}.tmp"
         
         while IFS= read -r pkg; do
             # Skip empty lines and comments
