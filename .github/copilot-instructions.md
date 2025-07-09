@@ -79,7 +79,7 @@ docker run --rm --privileged -v $(pwd):/workdir arch-iso-builder build out work
 
 ### Beep Suppression Patterns
 - **Defense in depth**: Always implement multiple layers - kernel, systemd, shell, GUI
-- **Graceful fallbacks**: Use `|| true` in scripts to continue if modules aren't loaded
+- **Graceful fallbacks**: Use `|| true` in shell scripts to continue if modules aren't loaded
 - **Comprehensive coverage**: Target all possible beep sources (PC speaker, ALSA, terminals, X11)
 
 ### Build System Conventions
