@@ -8,11 +8,20 @@
 set -e
 
 # Default configuration options (can be overridden by config file)
-CONFIG_FILE="/etc/package_tracking/config.conf"
-LOG_FILE="/var/log/package_tracking.log"
+# Use more portable paths that work in containers
+CONFIG_FILE="${XDG_CONFIG_HOME:-${HOME}/.config}/package_tracking/config.conf"
+if [ -w "/etc" ] 2>/dev/null; then
+    CONFIG_FILE="/etc/package_tracking/config.conf"
+fi
+
+LOG_FILE="${XDG_STATE_HOME:-${HOME}/.local/state}/package_tracking.log"
+if [ -w "/var/log" ] 2>/dev/null; then
+    LOG_FILE="/var/log/package_tracking.log"
+fi
+
 LOG_LEVEL="INFO"  # Options: DEBUG, INFO, WARNING, ERROR
 DATA_DIR="/tmp/package-versions"
-REPOS="core extra community multilib"
+REPOS="core extra multilib"  # Updated to remove deprecated 'community' repo
 CHECK_INTERVAL=86400  # 24 hours in seconds
 NOTIFY="true"
 TIMEOUT=30  # Connection timeout in seconds
@@ -33,10 +42,17 @@ UPDATES_FILE="${DATA_DIR}/package_updates.md"
 LAST_RUN_FILE="${DATA_DIR}/last_run.timestamp"
 
 # Create directory for storing log files if it doesn't exist
-mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+if ! mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null; then
+    # Fall back to current directory if we can't create the log directory
+    LOG_FILE="./package_tracking.log"
+    echo "Warning: Could not create log directory, using current directory" >&2
+fi
 
 # Create data directory if it doesn't exist
-mkdir -p "${DATA_DIR}" 2>/dev/null || true
+if ! mkdir -p "${DATA_DIR}" 2>/dev/null; then
+    echo "Error: Could not create data directory: ${DATA_DIR}" >&2
+    exit 1
+fi
 
 # Load configuration if exists
 if [ -f "$CONFIG_FILE" ]; then
@@ -175,6 +191,7 @@ get_current_versions() {
         log "DEBUG" "Found $total_packages packages to process"
         
         > "${CURRENT_VERSIONS_FILE}.tmp" # Create or truncate the temporary file
+chmod 600 "${CURRENT_VERSIONS_FILE}.tmp" 2>/dev/null || log "WARNING" "Could not set restrictive permissions on temporary file ${CURRENT_VERSIONS_FILE}.tmp"
         
         while IFS= read -r pkg; do
             # Skip empty lines and comments

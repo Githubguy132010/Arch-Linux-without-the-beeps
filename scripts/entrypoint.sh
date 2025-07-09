@@ -40,21 +40,25 @@ build_iso() {
     
     # Disable PC speaker module in airootfs if present
     if [ -f "airootfs/etc/modprobe.d/nobeep.conf" ] \
-       && grep -q "pcspkr" airootfs/etc/modprobe.d/nobeep.conf 2>/dev/null \
-       && grep -q "snd_pcsp" airootfs/etc/modprobe.d/nobeep.conf 2>/dev/null; then
+       && grep -q "pcspkr" "airootfs/etc/modprobe.d/nobeep.conf" 2>/dev/null \
+       && grep -q "snd_pcsp" "airootfs/etc/modprobe.d/nobeep.conf" 2>/dev/null; then
         log "PC speaker already disabled in airootfs configuration."
     else
         log "Disabling PC speaker in airootfs configuration..."
-        mkdir -p airootfs/etc/modprobe.d/
-        echo "blacklist pcspkr" > airootfs/etc/modprobe.d/nobeep.conf
-        echo "blacklist snd_pcsp" >> airootfs/etc/modprobe.d/nobeep.conf
+        mkdir -p "airootfs/etc/modprobe.d/"
+        echo "blacklist pcspkr" > "airootfs/etc/modprobe.d/nobeep.conf"
+        echo "blacklist snd_pcsp" >> "airootfs/etc/modprobe.d/nobeep.conf"
     fi
     
     # Create a custom hook to disable beeps in various config files
     if [ ! -f "airootfs/usr/share/libalpm/hooks/99-no-beep.hook" ]; then
         log "Creating custom hook to disable beeps..."
-        mkdir -p airootfs/usr/share/libalpm/hooks/
-        cat > airootfs/usr/share/libalpm/hooks/99-no-beep.hook << 'EOF'
+if ! mkdir -p "airootfs/usr/share/libalpm/hooks/" 2>/dev/null; then
+    warn "Failed to create hooks directory, continuing..."
+else
+    cat > "airootfs/usr/share/libalpm/hooks/99-no-beep.hook" << 'EOF'
+        else
+            cat > "airootfs/usr/share/libalpm/hooks/99-no-beep.hook" << 'EOF'
 [Trigger]
 Type = Package
 Operation = Install
@@ -66,21 +70,35 @@ Description = Disabling system beeps in various configuration files...
 When = PostTransaction
 Exec = /bin/bash -c "mkdir -p /etc/modprobe.d && echo 'blacklist pcspkr' > /etc/modprobe.d/nobeep.conf && echo 'blacklist snd_pcsp' >> /etc/modprobe.d/nobeep.conf && if [ -f /etc/inputrc ]; then grep -q 'set bell-style none' /etc/inputrc || echo 'set bell-style none' >> /etc/inputrc; fi"
 EOF
+        fi
     fi
     
     # Add settings to disable terminal bell in bash
     if [ ! -f "airootfs/etc/skel/.bashrc" ]; then
         log "Adding bash configuration to disable terminal bell..."
-        mkdir -p airootfs/etc/skel/
-        echo "# Disable terminal bell" > airootfs/etc/skel/.bashrc
-        echo "bind 'set bell-style none'" >> airootfs/etc/skel/.bashrc
+if ! mkdir -p "airootfs/etc/skel/" 2>/dev/null; then
+    warn "Failed to create skel directory, continuing..."
+else
+    echo "# Disable terminal bell" > "airootfs/etc/skel/.bashrc"
+    echo "bind 'set bell-style none'" >> "airootfs/etc/skel/.bashrc"
+fi
+        else
+            echo "# Disable terminal bell" > "airootfs/etc/skel/.bashrc"
+            echo "bind 'set bell-style none'" >> "airootfs/etc/skel/.bashrc"
+        fi
     fi
 
     # Set bell-style none in global inputrc
     if [ ! -f "airootfs/etc/inputrc" ]; then
         log "Setting bell-style none in global inputrc..."
-        mkdir -p airootfs/etc
-        echo "set bell-style none" > airootfs/etc/inputrc
+if ! mkdir -p "airootfs/etc" 2>/dev/null; then
+    warn "Failed to create etc directory, continuing..."
+else
+    echo "set bell-style none" > "airootfs/etc/inputrc"
+fi
+        else
+            echo "set bell-style none" > "airootfs/etc/inputrc"
+        fi
     fi
     
     # Optimize the build process with parallel compression

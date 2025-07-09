@@ -2,8 +2,9 @@
 Description=Disable system beeps
 Documentation=https://github.com/Githubguy132010/Arch-Linux-without-the-beeps
 DefaultDependencies=no
-Before=sysinit.target
+Before=sysinit.target shutdown.target
 After=local-fs.target
+Conflicts=shutdown.target
 
 [Service]
 Type=oneshot
