@@ -67,7 +67,7 @@ docker run --rm --privileged -v $(pwd):/workdir arch-iso-builder build out work
 
 ### Package Management
 - Always run `sort -u packages.x86_64 -o packages.x86_64` after modifying package lists
-- Use `scripts/package_tracking/track_package_updates.sh` for release notes generation
+- Use `scripts/package_tracking/track_package_updates.sh` for release notes generation (tracks package updates)
 - Bootstrap packages must be minimal - only what's needed for the build process
 
 ## Project-Specific Conventions
