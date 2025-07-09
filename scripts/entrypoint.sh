@@ -91,8 +91,11 @@ fi
     # Set bell-style none in global inputrc
     if [ ! -f "airootfs/etc/inputrc" ]; then
         log "Setting bell-style none in global inputrc..."
-        if ! mkdir -p "airootfs/etc" 2>/dev/null; then
-            warn "Failed to create etc directory, continuing..."
+if ! mkdir -p "airootfs/etc" 2>/dev/null; then
+    warn "Failed to create etc directory, continuing..."
+else
+    echo "set bell-style none" > "airootfs/etc/inputrc"
+fi
         else
             echo "set bell-style none" > "airootfs/etc/inputrc"
         fi
