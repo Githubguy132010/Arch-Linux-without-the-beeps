@@ -16,7 +16,7 @@ env:
   DOCKER_BUILDKIT: 1
   PACMAN_CACHE: /tmp/pacman-cache
   WORKSPACE: /workdir
-  BUILD_DIR: /workdir/workdir
+  BUILD_DIR: /workdir/work
   OUTPUT_DIR: /workdir/out
 
 jobs:

@@ -53,10 +53,8 @@ build_iso() {
     # Create a custom hook to disable beeps in various config files
     if [ ! -f "airootfs/usr/share/libalpm/hooks/99-no-beep.hook" ]; then
         log "Creating custom hook to disable beeps..."
-if ! mkdir -p "airootfs/usr/share/libalpm/hooks/" 2>/dev/null; then
-    warn "Failed to create hooks directory, continuing..."
-else
-    cat > "airootfs/usr/share/libalpm/hooks/99-no-beep.hook" << 'EOF'
+        if ! mkdir -p "airootfs/usr/share/libalpm/hooks/" 2>/dev/null; then
+            warn "Failed to create hooks directory, continuing..."
         else
             cat > "airootfs/usr/share/libalpm/hooks/99-no-beep.hook" << 'EOF'
 [Trigger]
@@ -76,12 +74,8 @@ EOF
     # Add settings to disable terminal bell in bash
     if [ ! -f "airootfs/etc/skel/.bashrc" ]; then
         log "Adding bash configuration to disable terminal bell..."
-if ! mkdir -p "airootfs/etc/skel/" 2>/dev/null; then
-    warn "Failed to create skel directory, continuing..."
-else
-    echo "# Disable terminal bell" > "airootfs/etc/skel/.bashrc"
-    echo "bind 'set bell-style none'" >> "airootfs/etc/skel/.bashrc"
-fi
+        if ! mkdir -p "airootfs/etc/skel/" 2>/dev/null; then
+            warn "Failed to create skel directory, continuing..."
         else
             echo "# Disable terminal bell" > "airootfs/etc/skel/.bashrc"
             echo "bind 'set bell-style none'" >> "airootfs/etc/skel/.bashrc"
@@ -91,11 +85,8 @@ fi
     # Set bell-style none in global inputrc
     if [ ! -f "airootfs/etc/inputrc" ]; then
         log "Setting bell-style none in global inputrc..."
-if ! mkdir -p "airootfs/etc" 2>/dev/null; then
-    warn "Failed to create etc directory, continuing..."
-else
-    echo "set bell-style none" > "airootfs/etc/inputrc"
-fi
+        if ! mkdir -p "airootfs/etc" 2>/dev/null; then
+            warn "Failed to create etc directory, continuing..."
         else
             echo "set bell-style none" > "airootfs/etc/inputrc"
         fi
