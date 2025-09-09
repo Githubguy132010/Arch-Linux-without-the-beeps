@@ -1,0 +1,41 @@
+name: GUI Build Test
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+jobs:
+  test-gui-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build the GUI Docker image
+        run: sudo docker build -t arch-iso-gui -f Dockerfile.gui .
+
+      - name: Run the GUI container
+        run: sudo docker run --rm --privileged -d -p 8080:8080 --name arch-iso-gui-test -v $(pwd):/workdir arch-iso-gui
+
+      - name: Wait for the server to start
+        run: sleep 15
+
+      - name: Trigger ISO build and wait for completion
+        # This step triggers the build via the API and waits for the "BUILD_SUCCESS" message.
+        # The build can take a long time, so a generous timeout is set.
+        run: |
+          curl -N --max-time 7200 http://localhost:8080/build | tee build.log
+          grep -q "BUILD_SUCCESS" build.log
+
+      - name: Verify ISO file was created
+        run: sudo docker exec arch-iso-gui-test test -f /workdir/out/Arch.iso
+
+      - name: Test ISO download endpoint
+        run: curl -f -I http://localhost:8080/download | grep -q 'Content-Disposition: attachment; filename=Arch.iso'
+
+      - name: Stop the container
+        if: always()
+        run: sudo docker stop arch-iso-gui-test

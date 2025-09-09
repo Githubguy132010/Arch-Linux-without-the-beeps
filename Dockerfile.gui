@@ -1,0 +1,40 @@
+# Use the same builder as the original Dockerfile
+FROM archlinux:latest AS builder
+
+# Set up parallel downloads and other optimizations
+COPY pacman.conf /etc/pacman.conf
+
+# Update system and install necessary packages
+RUN pacman -Syu --noconfirm && \
+    pacman -S --noconfirm --needed \
+    git \
+    archiso \
+    grub \
+    base-devel \
+    python-flask \
+    && pacman -Scc --noconfirm
+
+# Set the working directory
+WORKDIR /build
+
+# Copy only necessary files for package installation
+COPY packages.x86_64 bootstrap_packages.x86_64 profiledef.sh ./
+
+# Create a new final image
+FROM builder AS final
+
+# Set the working directory
+WORKDIR /workdir
+
+# Copy the rest of the files
+COPY . .
+
+# Use an entrypoint script for better flexibility
+COPY ./scripts/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Expose the port for the web GUI
+EXPOSE 8080
+
+# Set the entrypoint to run the Flask application
+ENTRYPOINT ["python", "app.py"]
