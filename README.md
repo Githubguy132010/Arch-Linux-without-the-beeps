@@ -84,6 +84,55 @@ To install Docker, follow the instructions for your operating system:
 
    Once the process completes, the ISO will be available in the `out/` directory within your local folder as `Arch.iso`.
 
+---
+
+## How to Build the ISO with a GUI
+
+For a more user-friendly experience, you can use a Docker container that provides a web-based graphical user interface (GUI) to build the ISO.
+
+### Prerequisites
+
+Ensure you have Docker installed and running on your system.
+
+### Steps to Build with the GUI
+
+1. **Clone the repository**:
+
+   ```bash
+   git clone https://github.com/Githubguy132010/Arch-Linux-without-the-beeps.git
+   cd Arch-Linux-without-the-beeps
+   ```
+
+2. **Build the GUI Docker Image**:
+
+   Build the Docker image for the GUI application.
+
+   ```bash
+   docker build -t arch-iso-gui -f Dockerfile.gui .
+   ```
+
+3. **Run the GUI Container**:
+
+   Run the container, mapping port 8080 to your host system.
+
+   ```bash
+   docker run --rm --privileged -p 8080:8080 -v $(pwd):/workdir arch-iso-gui
+   ```
+
+4. **Access the GUI**:
+
+   Open your web browser and navigate to `http://localhost:8080`.
+
+5. **Build the ISO**:
+
+   Click the "Build ISO" button to start the build process. The logs will be displayed in real-time on the page.
+
+6. **Download the ISO**:
+
+   Once the build is complete, a download link for `Arch.iso` will appear.
+
+---
+
 ## How to Use GitHub Actions (Automated Workflow)
 
 This repository also includes a GitHub Actions workflow for building and releasing the ISO automatically on GitHub. 

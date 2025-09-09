@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arch ISO Builder</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        #log { white-space: pre-wrap; background-color: #f4f4f4; border: 1px solid #ddd; padding: 1em; height: 400px; overflow-y: scroll; }
+        #buildBtn { padding: 0.5em 1em; font-size: 1em; }
+        #downloadLinkContainer { margin-top: 1em; }
+    </style>
+</head>
+<body>
+    <h1>Arch Linux ISO Builder</h1>
+    <button id="buildBtn">Build ISO</button>
+    <h2>Build Log</h2>
+    <pre id="log"></pre>
+    <div id="downloadLinkContainer"></div>
+
+    <script>
+        const buildBtn = document.getElementById('buildBtn');
+        const log = document.getElementById('log');
+        const downloadLinkContainer = document.getElementById('downloadLinkContainer');
+
+        buildBtn.addEventListener('click', () => {
+            buildBtn.disabled = true;
+            log.textContent = 'Starting build...\n';
+            downloadLinkContainer.innerHTML = '';
+
+            const eventSource = new EventSource('/build');
+
+            eventSource.onmessage = function(event) {
+                if (event.data === 'BUILD_SUCCESS') {
+                    log.textContent += '\nBuild finished successfully!\n';
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = '/download';
+                    downloadLink.textContent = 'Download ISO';
+                    downloadLinkContainer.appendChild(downloadLink);
+                    eventSource.close();
+                    buildBtn.disabled = false;
+                } else if (event.data === 'BUILD_FAILED') {
+                    log.textContent += '\nBuild failed!\n';
+                    eventSource.close();
+                    buildBtn.disabled = false;
+                } else {
+                    log.textContent += event.data + '\n';
+                    log.scrollTop = log.scrollHeight;
+                }
+            };
+
+            eventSource.onerror = function() {
+                log.textContent += '\nError connecting to the server.\n';
+                eventSource.close();
+                buildBtn.disabled = false;
+            };
+        });
+    </script>
+</body>
+</html>
