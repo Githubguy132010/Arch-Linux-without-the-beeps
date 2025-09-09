@@ -1,0 +1,28 @@
+name: GUI Build Test
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-gui-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build the GUI Docker image
+        run: sudo docker build -t arch-iso-gui -f Dockerfile.gui .
+
+      - name: Run the GUI container
+        run: sudo docker run --rm --privileged -d -p 8080:8080 --name arch-iso-gui-test -v $(pwd):/workdir arch-iso-gui
+
+      - name: Wait for the server to start
+        run: sleep 15
+
+      - name: Check if the web server is responding
+        run: curl -f http://localhost:8080
+
+      - name: Stop the container
+        run: sudo docker stop arch-iso-gui-test
