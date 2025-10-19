@@ -1,7 +1,7 @@
 alsa-utils
 amd-ucode
-archinstall
 arch-install-scripts
+archinstall
 b43-fwcutter
 base
 bcachefs-tools
@@ -77,11 +77,11 @@ nilfs-utils
 nmap
 ntfs-3g
 nvme-cli
-openconnect
 open-iscsi
+open-vm-tools
+openconnect
 openpgp-card-tools
 openssh
-open-vm-tools
 openvpn
 partclone
 parted
