@@ -9,6 +9,11 @@ RUN pacman -Syu --noconfirm && \
     git \
     archiso \
     grub \
+    syslinux \
+    systemd \
+    efibootmgr \
+    dosfstools \
+    mtools \
     base-devel \
     && pacman -Scc --noconfirm
 
