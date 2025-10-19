@@ -14,6 +14,8 @@ RUN pacman -Syu --noconfirm && \
     efibootmgr \
     dosfstools \
     mtools \
+    arch-install-scripts \
+    bash \
     base-devel \
     && pacman -Scc --noconfirm
 

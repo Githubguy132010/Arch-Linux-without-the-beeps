@@ -99,6 +99,14 @@ EOF
     # Note: We don't modify profiledef.sh anymore as -Xthreads is not supported by mksquashfs
     # The profiledef.sh file already has proper XZ compression settings
     
+    # Verify mkarchiso is available and check its version
+    log "Verifying mkarchiso installation..."
+    if ! command -v mkarchiso &> /dev/null; then
+        error "mkarchiso command not found. Please ensure archiso package is properly installed."
+    fi
+    
+    log "mkarchiso version: $(mkarchiso --version 2>/dev/null || echo 'unknown')"
+    
     # Run mkarchiso with verbose option and handle errors
     log "Building Arch ISO with mkarchiso..."
     if mkarchiso -v -w "$work_dir" -o "$output_dir" .; then
