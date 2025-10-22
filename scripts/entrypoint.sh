@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 # Colors for better output
 RED='\033[0;31m'
@@ -21,42 +21,45 @@ error() {
     exit 1
 }
 
+# --- Atomic File Operations ---
+safe_write() {
+    local content="$1"
+    local target_file="$2"
+    local temp_file
+    temp_file=$(mktemp)
+
+    echo -e "$content" > "$temp_file"
+    mv "$temp_file" "$target_file"
+}
+
 # Function to build the ISO
 build_iso() {
     local output_dir="${1:-out}"
     local work_dir="${2:-work}"
+
+    if ! [[ "$output_dir" =~ ^[a-zA-Z0-9_-]+$ ]] || \
+       ! [[ "$work_dir" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        error "Invalid characters in directory names. Only alphanumeric, underscore, and hyphen are allowed."
+    fi
     
     log "Starting Arch Linux ISO build process..."
     log "Work directory: $work_dir"
     log "Output directory: $output_dir"
     
-    # Create necessary directories
-    mkdir -p "$output_dir"
-    mkdir -p "$work_dir"
+    mkdir -p "$output_dir" "$work_dir"
     
-    # Run the mirror selection script
     log "Selecting fastest mirrors..."
-    ./scripts/select-mirrors.sh || warn "Mirror selection failed, continuing with default mirrors"
-    
-    # Disable PC speaker module in airootfs if present
-    if [ -f "airootfs/etc/modprobe.d/nobeep.conf" ] \
-       && grep -q "pcspkr" "airootfs/etc/modprobe.d/nobeep.conf" 2>/dev/null \
-       && grep -q "snd_pcsp" "airootfs/etc/modprobe.d/nobeep.conf" 2>/dev/null; then
-        log "PC speaker already disabled in airootfs configuration."
-    else
-        log "Disabling PC speaker in airootfs configuration..."
-        mkdir -p "airootfs/etc/modprobe.d/"
-        echo "blacklist pcspkr" > "airootfs/etc/modprobe.d/nobeep.conf"
-        echo "blacklist snd_pcsp" >> "airootfs/etc/modprobe.d/nobeep.conf"
+    if ! ./scripts/select-mirrors.sh; then
+        error "Mirror selection failed. Aborting build."
     fi
     
-    # Create a custom hook to disable beeps in various config files
-    if [ ! -f "airootfs/usr/share/libalpm/hooks/99-no-beep.hook" ]; then
-        log "Creating custom hook to disable beeps..."
-        if ! mkdir -p "airootfs/usr/share/libalpm/hooks/" 2>/dev/null; then
-            warn "Failed to create hooks directory, continuing..."
-        else
-            cat > "airootfs/usr/share/libalpm/hooks/99-no-beep.hook" << 'EOF'
+    log "Disabling PC speaker in airootfs configuration..."
+    mkdir -p "airootfs/etc/modprobe.d/"
+    safe_write "blacklist pcspkr\nblacklist snd_pcsp" "airootfs/etc/modprobe.d/nobeep.conf"
+
+    log "Creating custom hook to disable beeps..."
+    mkdir -p "airootfs/usr/share/libalpm/hooks/"
+    read -r -d '' HOOK_CONTENT << 'EOF'
 [Trigger]
 Type = Package
 Operation = Install
@@ -66,40 +69,21 @@ Target = *
 [Action]
 Description = Disabling system beeps in various configuration files...
 When = PostTransaction
-Exec = /bin/bash -c "mkdir -p /etc/modprobe.d && echo 'blacklist pcspkr' > /etc/modprobe.d/nobeep.conf && echo 'blacklist snd_pcsp' >> /etc/modprobe.d/nobeep.conf && if [ -f /etc/inputrc ]; then grep -q 'set bell-style none' /etc/inputrc || echo 'set bell-style none' >> /etc/inputrc; fi"
+Exec = /bin/bash -c "mkdir -p /etc/modprobe.d && { echo -e 'blacklist pcspkr\nblacklist snd_pcsp' > /etc/modprobe.d/nobeep.conf.tmp && mv /etc/modprobe.d/nobeep.conf.tmp /etc/modprobe.d/nobeep.conf; } && if [ -f /etc/inputrc ]; then grep -q 'set bell-style none' /etc/inputrc || echo 'set bell-style none' >> /etc/inputrc; fi"
 EOF
-        fi
-    fi
+    safe_write "$HOOK_CONTENT" "airootfs/usr/share/libalpm/hooks/99-no-beep.hook"
     
-    # Add settings to disable terminal bell in bash
-    if [ ! -f "airootfs/etc/skel/.bashrc" ]; then
-        log "Adding bash configuration to disable terminal bell..."
-        if ! mkdir -p "airootfs/etc/skel/" 2>/dev/null; then
-            warn "Failed to create skel directory, continuing..."
-        else
-            echo "# Disable terminal bell" > "airootfs/etc/skel/.bashrc"
-            echo "bind 'set bell-style none'" >> "airootfs/etc/skel/.bashrc"
-        fi
-    fi
+    log "Adding bash configuration to disable terminal bell..."
+    mkdir -p "airootfs/etc/skel/"
+    safe_write "# Disable terminal bell\nbind 'set bell-style none'" "airootfs/etc/skel/.bashrc"
 
-    # Set bell-style none in global inputrc
-    if [ ! -f "airootfs/etc/inputrc" ]; then
-        log "Setting bell-style none in global inputrc..."
-        if ! mkdir -p "airootfs/etc" 2>/dev/null; then
-            warn "Failed to create etc directory, continuing..."
-        else
-            echo "set bell-style none" > "airootfs/etc/inputrc"
-        fi
-    fi
+    log "Setting bell-style none in global inputrc..."
+    mkdir -p "airootfs/etc"
+    safe_write "set bell-style none" "airootfs/etc/inputrc"
     
-    # Optimize the build process with parallel compression
     export JOBS=$(nproc)
     log "Using $JOBS processors for parallel compression"
     
-    # Note: We don't modify profiledef.sh anymore as -Xthreads is not supported by mksquashfs
-    # The profiledef.sh file already has proper XZ compression settings
-    
-    # Run mkarchiso with verbose option and handle errors
     log "Building Arch ISO with mkarchiso..."
     if mkarchiso -v -w "$work_dir" -o "$output_dir" .; then
         log "ISO build completed successfully!"
@@ -109,41 +93,46 @@ EOF
     fi
 }
 
-# Function to clean up build artifacts
 clean() {
     log "Cleaning up build artifacts..."
-    rm -rf work/*
+    find work -mindepth 1 -delete
     log "Cleanup complete."
 }
 
-# Function to validate the configuration
 validate() {
     log "Validating configuration..."
     
-    # Check if packages.x86_64 exists
-    if [ ! -f "packages.x86_64" ]; then
-        error "packages.x86_64 file not found!"
-    fi
+    # Check for required files
+    for f in packages.x86_64 profiledef.sh pacman.conf; do
+        if [ ! -f "$f" ]; then
+            error "$f file not found!"
+        fi
+    done
     
-    # Check if profiledef.sh exists and is executable
+    # Check for executable permissions
     if [ ! -x "profiledef.sh" ]; then
-        error "profiledef.sh not found or not executable!"
+        error "profiledef.sh is not executable!"
+    fi
+
+    # Validate profiledef.sh content
+    if ! grep -q "iso_name=" "profiledef.sh"; then
+        error "profiledef.sh is missing the 'iso_name' variable."
     fi
     
-    # Check if pacman.conf exists
-    if [ ! -f "pacman.conf" ]; then
-        error "pacman.conf not found!"
-    fi
-    
+    # Validate package list syntax
+    for list in packages.x86_64 bootstrap_packages.x86_64; do
+        if [ -f "$list" ] && grep -qE '[^a-zA-Z0-9_+-]' "$list"; then
+            error "$list contains invalid characters. Only alphanumeric, underscore, hyphen, and plus are allowed."
+        fi
+    done
+
     # Sort and deduplicate package lists
     log "Sorting and deduplicating package lists..."
-    if [ -f "packages.x86_64" ]; then
-        sort -u packages.x86_64 -o packages.x86_64
-    fi
-    
-    if [ -f "bootstrap_packages.x86_64" ]; then
-        sort -u bootstrap_packages.x86_64 -o bootstrap_packages.x86_64
-    fi
+    for list in packages.x86_64 bootstrap_packages.x86_64; do
+        if [ -f "$list" ]; then
+            sort -u "$list" -o "$list"
+        fi
+    done
     
     log "Configuration appears valid."
 }

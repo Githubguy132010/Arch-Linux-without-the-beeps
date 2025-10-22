@@ -40,7 +40,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.PACMAN_CACHE }}
-          key: archlinux-pacman-${{ hashFiles('packages.x86_64', 'bootstrap_packages.x86_64') }}
+          key: archlinux-pacman-${{ hashFiles('pacman.conf', 'packages.x86_64', 'bootstrap_packages.x86_64') }}
           restore-keys: |
             archlinux-pacman-
 
@@ -56,9 +56,9 @@ jobs:
 
       - name: Build ISO
         run: |
-          # Run the ISO build with privileged mode to allow loop device mounting
+          # Run the ISO build with required capabilities instead of full privileged mode
           # The 'build' command is passed to the entrypoint script
-          docker run --rm --privileged \
+          docker run --rm --cap-add=SYS_ADMIN --cap-add=MKNOD \
             -v ${{ github.workspace }}:${{ env.WORKSPACE }} \
             -v ${{ env.PACMAN_CACHE }}:/var/cache/pacman/pkg \
             arch-iso-builder build out work || {

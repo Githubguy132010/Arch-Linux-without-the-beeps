@@ -8,22 +8,37 @@ iso_application="Arch Linux No Beep Live/Rescue DVD"
 iso_version="$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y.%m.%d)"
 install_dir="arch"
 buildmodes=('iso')
+# Use simplified, general bootmodes
 bootmodes=('bios.syslinux' 'uefi.systemd-boot')
 arch="x86_64"
 pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"
+bootstrap_tarball_compression=('zstd' '-c' '-T0' '--auto-threads=logical' '--long' '-19')
 
-# Use better compression options correctly formatted for mksquashfs with XZ
-# XZ compressor supports these options: -Xbcj and -Xdict-size
-if [ "$(nproc)" -gt 2 ]; then
-  # For multi-core systems: use XZ with bcj x86 filter for better compression
-  airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '1M')
+# Correctly formatted compression options for mksquashfs with XZ
+# -b (block size) must be a power of 2, max 1M (1048576)
+# -Xdict-size (dictionary size) should be a power of 2, max 1M
+# -Xthreads=0 tells XZ to use all available CPU cores
+if [ "$(nproc)" -ge 4 ]; then
+  # For systems with 4 or more cores, use multi-threading and larger dictionary
+  airootfs_image_tool_options=(
+    '-comp' 'xz'
+    '-Xbcj' 'x86'
+    '-b' '1M'
+    '-Xdict-size' '1M'
+    '-Xthreads' '0'
+  )
 else
-  # For single/dual-core systems: use safe fixed dictionary size
-  airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '512K')
+  # For systems with fewer than 4 cores, use a single thread and smaller dictionary
+  airootfs_image_tool_options=(
+    '-comp' 'xz'
+    '-Xbcj' 'x86'
+    '-b' '512K'
+    '-Xdict-size' '512K'
+    '-Xthreads' '1'
+  )
 fi
 
-bootstrap_tarball_compression=('zstd' '-c' '-T0' '--auto-threads=logical' '--long' '-19')
 file_permissions=(
   ["/etc/shadow"]="0:0:400"
   ["/root"]="0:0:750"
