@@ -44,7 +44,7 @@ fi
 
 # Generate mirror list with reflector
 log "Generating optimized mirror list..."
-if ! reflector --latest 20 --sort rate --protocol https --save airootfs/etc/pacman.d/mirrorlist; then
+if ! reflector --latest 20 --sort rate --protocol https --download-timeout 15 --save airootfs/etc/pacman.d/mirrorlist; then
     error "Reflector failed to generate a new mirror list. The build cannot continue."
 fi
 

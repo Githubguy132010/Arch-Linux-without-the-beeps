@@ -34,7 +34,8 @@ jobs:
         run: sudo docker exec arch-iso-gui-test test -f /workdir/out/Arch.iso
 
       - name: Test ISO download endpoint
-        run: curl -f -I http://localhost:8080/download | grep -q 'Content-Disposition: attachment; filename=Arch.iso'
+        run: |
+          curl -f -I http://localhost:8080/download | grep -q 'Content-Disposition: attachment; filename=Arch.iso'
 
       - name: Stop the container
         if: always()
