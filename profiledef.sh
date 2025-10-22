@@ -15,27 +15,20 @@ pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"
 bootstrap_tarball_compression=('zstd' '-c' '-T0' '--auto-threads=logical' '--long' '-19')
 
-# Correctly formatted compression options for mksquashfs with XZ
-# -b (block size) must be a power of 2, max 1M (1048576)
-# -Xdict-size (dictionary size) should be a power of 2, max 1M
-# Use the -processors option to control the number of CPUs to use
+# Base compression options for mksquashfs
+airootfs_image_tool_options=(
+  '-comp' 'xz'
+  '-Xbcj' 'x86'
+  '-b' '1M'
+  '-Xdict-size' '1M'
+)
+
+# Determine the number of processors to use for compression
 if [ "$(nproc)" -ge 4 ]; then
-  # For systems with 4 or more cores, use multi-threading and larger dictionary
-  airootfs_image_tool_options=(
-    '-comp' 'xz'
-    '-Xbcj' 'x86'
-    '-b' '1M'
-    '-Xdict-size' '1M'
-  )
+  # Use all available cores for systems with 4 or more cores
   airootfs_image_tool_options+=('-processors' "$(nproc)")
 else
-  # For systems with fewer than 4 cores, use a single thread and smaller dictionary
-  airootfs_image_tool_options=(
-    '-comp' 'xz'
-    '-Xbcj' 'x86'
-    '-b' '512K'
-    '-Xdict-size' '512K'
-  )
+  # Use a single thread for systems with fewer than 4 cores
   airootfs_image_tool_options+=('-processors' '1')
 fi
 
